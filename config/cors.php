@@ -24,8 +24,10 @@ return [
         // ---------------------------------------------------------
         // 1. ENTORNO LOCAL (Desarrollo)
         // ---------------------------------------------------------
-        'http://localhost:5174',      // Tu App Hija Local
+        'http://localhost:5174',
+        'http://localhost:5175',     // Tu App Hija Local
         'http://127.0.0.1:5174',      // Variante IP
+        'http://127.0.0.1:5175',
 
         // ---------------------------------------------------------
         // 2. ENTORNO PRODUCCIÓN (Google Cloud)
