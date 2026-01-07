@@ -36,7 +36,17 @@ class SolicitudController extends Controller
             $query->where('estado', $request->estado);
         }
 
-        return response()->json($query->paginate(20));
+        return response()->json($query->paginate(20)->through(function ($item) {
+            $disk = Storage::disk($this->disk);
+            $ttl = now()->addMinutes(20);
+
+            $item->url_documento_adjunto = $item->path_documento_adjunto ? $disk->temporaryUrl($item->path_documento_adjunto, $ttl) : null;
+            $item->url_documento_firmado = $item->path_documento_firmado ? $disk->temporaryUrl($item->path_documento_firmado, $ttl) : null;
+            $item->url_foto_entrega = $item->path_foto_entrega ? $disk->temporaryUrl($item->path_foto_entrega, $ttl) : null;
+            $item->url_foto_conocimiento = $item->path_foto_conocimiento ? $disk->temporaryUrl($item->path_foto_conocimiento, $ttl) : null;
+
+            return $item;
+        }));
     }
 
     // ----------------------------------------------------------------
@@ -181,9 +191,20 @@ class SolicitudController extends Controller
             'telefono' => 'nullable|string',
             'monto' => 'nullable|numeric',
             'comentario_solicitud' => 'nullable|string',
+            'documento_adjunto' => 'nullable|file|mimes:pdf|max:5120',
         ]);
 
-        $solicitud->update(array_filter($data)); // Solo actualiza lo enviado
+        $dataToUpdate = array_filter($data);
+
+        // Si suben nuevo archivo, borrar el anterior y guardar nuevo
+        if ($request->hasFile('documento_adjunto')) {
+            if ($solicitud->path_documento_adjunto) {
+                Storage::disk($this->disk)->delete($solicitud->path_documento_adjunto);
+            }
+            $dataToUpdate['path_documento_adjunto'] = $request->file('documento_adjunto')->store('solicitudes/iniciales', $this->disk);
+        }
+
+        $solicitud->update($dataToUpdate);
 
         return response()->json(['msg' => 'Solicitud actualizada', 'data' => $solicitud]);
     }
@@ -231,10 +252,10 @@ class SolicitudController extends Controller
             return response()->json(['error' => 'Archivo no encontrado'], 404);
         }
 
-        // Genera URL temporal (15 minutos)
+        // Genera URL temporal (5 minutos)
         $url = Storage::disk($this->disk)->temporaryUrl(
             $path,
-            now()->addMinutes(15)
+            now()->addMinutes(5)
         );
 
         return response()->json(['url' => $url]);
