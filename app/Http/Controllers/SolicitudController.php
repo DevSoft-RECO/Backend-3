@@ -9,6 +9,9 @@ use Illuminate\Support\Facades\Storage;
 
 class SolicitudController extends Controller
 {
+    // Definimos el nombre del disco para no escribirlo muchas veces
+    protected $disk = 'gcs';
+
     // ----------------------------------------------------------------
     // LISTAR (Filtros: fecha_evento, estado)
     // ----------------------------------------------------------------
@@ -49,24 +52,23 @@ class SolicitudController extends Controller
             'nombre_contacto' => 'nullable|string',
             'comunidad_id' => 'required|exists:comunidades,id',
             'comentario_solicitud' => 'required|string',
-            'documento_adjunto' => 'required|file|mimes:pdf|max:5120', // Max 5MB
+            'documento_adjunto' => 'required|file|mimes:pdf|max:5120',
         ]);
 
-        // Guardar archivo
-        $path = $request->file('documento_adjunto')->store('solicitudes/iniciales', 'public');
+        // CAMBIO: Usamos el disco 'gcs' en lugar de 'public'
+        $path = $request->file('documento_adjunto')->store('solicitudes/iniciales', $this->disk);
 
-        // Obtener datos del TOKEN
-        $user = $request->user(); // El usuario autenticado
+        $user = $request->user();
 
         $solicitud = SolicitudApoyo::create([
             ...$data,
             'path_documento_adjunto' => $path,
-            'usuario_creacion_id' => $user->id,      // Del Token
-            'agencia_id' => $user->agencia_id ?? 1,       // Del Token (Assuming agencia_id might check or default logic if not present, but user snippet says $user->agencia_id. I will stick to it. Wait, user specifically said "$user->agencia_id // Del Token". If User model doesn't have agencia_id, this might fail unless added to User or JWT. For now I assume it works.)
+            'usuario_creacion_id' => $user->id,
+            'agencia_id' => $user->agencia_id ?? 1,
             'estado' => EstadoSolicitud::Solicitado,
         ]);
 
-        return response()->json(['msg' => 'Solicitud creada', 'data' => $solicitud], 201);
+        return response()->json(['msg' => 'Solicitud creada en GCS', 'data' => $solicitud], 201);
     }
 
     // ----------------------------------------------------------------
@@ -102,14 +104,15 @@ class SolicitudController extends Controller
             'documento_firmado' => 'required|file|mimes:pdf|max:5120',
         ]);
 
-        $path = $request->file('documento_firmado')->store('solicitudes/firmados', 'public');
+        // CAMBIO: Guardamos en 'gcs'
+        $path = $request->file('documento_firmado')->store('solicitudes/firmados', $this->disk);
 
         $solicitud->update([
             'responsable_asignado' => $request->responsable_asignado,
             'tipo_apoyo_id' => $request->tipo_apoyo_id,
             'monto' => $request->monto,
             'path_documento_firmado' => $path,
-            'usuario_aprobacion_id' => $request->user()->id, // Auditoría
+            'usuario_aprobacion_id' => $request->user()->id,
             'estado' => EstadoSolicitud::Aprobado,
         ]);
 
@@ -121,18 +124,18 @@ class SolicitudController extends Controller
     // ----------------------------------------------------------------
     public function finalizar(Request $request, SolicitudApoyo $solicitud)
     {
-        // Solo se puede finalizar si ya fue aprobada
         if ($solicitud->estado !== EstadoSolicitud::Aprobado) {
-            return response()->json(['error' => 'La solicitud debe estar APROBADA antes de finalizar'], 400);
+            return response()->json(['error' => 'La solicitud debe estar APROBADA'], 400);
         }
 
         $request->validate([
-            'foto_entrega' => 'required|image|max:2048', // 2MB
+            'foto_entrega' => 'required|image|max:2048',
             'foto_conocimiento' => 'required|image|max:2048',
         ]);
 
-        $pathEntrega = $request->file('foto_entrega')->store('evidencias', 'public');
-        $pathConocimiento = $request->file('foto_conocimiento')->store('evidencias', 'public');
+        // CAMBIO: Fotos enviadas directo a la nube
+        $pathEntrega = $request->file('foto_entrega')->store('evidencias', $this->disk);
+        $pathConocimiento = $request->file('foto_conocimiento')->store('evidencias', $this->disk);
 
         $solicitud->update([
             'path_foto_entrega' => $pathEntrega,
@@ -140,7 +143,7 @@ class SolicitudController extends Controller
             'estado' => EstadoSolicitud::Finalizado,
         ]);
 
-        return response()->json(['msg' => 'Proceso Finalizado Exitosamente']);
+        return response()->json(['msg' => 'Proceso Finalizado en Google Cloud']);
     }
 
     // ----------------------------------------------------------------
@@ -153,7 +156,6 @@ class SolicitudController extends Controller
         $solicitud->update([
             'estado' => EstadoSolicitud::Rechazado,
             'motivo_rechazo' => $request->motivo_rechazo,
-            // Opcional: Podrías guardar quien rechazó usando una de las columnas de usuario existentes o una nueva
         ]);
 
         return response()->json(['msg' => 'Solicitud Rechazada']);
@@ -179,7 +181,6 @@ class SolicitudController extends Controller
             'telefono' => 'nullable|string',
             'monto' => 'nullable|numeric',
             'comentario_solicitud' => 'nullable|string',
-            // Agrega aqui otros campos que se permitan editar
         ]);
 
         $solicitud->update(array_filter($data)); // Solo actualiza lo enviado
@@ -192,12 +193,50 @@ class SolicitudController extends Controller
     // ----------------------------------------------------------------
     public function destroy(SolicitudApoyo $solicitud)
     {
-        // Eliminar archivos asociados si es necesario (opcional)
-        if ($solicitud->path_documento_adjunto) Storage::disk('public')->delete($solicitud->path_documento_adjunto);
-        if ($solicitud->path_documento_firmado) Storage::disk('public')->delete($solicitud->path_documento_firmado);
+        // CAMBIO: Eliminamos del disco 'gcs'
+        if ($solicitud->path_documento_adjunto) {
+            Storage::disk($this->disk)->delete($solicitud->path_documento_adjunto);
+        }
+        if ($solicitud->path_documento_firmado) {
+            Storage::disk($this->disk)->delete($solicitud->path_documento_firmado);
+        }
+        if ($solicitud->path_foto_entrega) {
+            Storage::disk($this->disk)->delete($solicitud->path_foto_entrega);
+        }
+        if ($solicitud->path_foto_conocimiento) {
+            Storage::disk($this->disk)->delete($solicitud->path_foto_conocimiento);
+        }
 
         $solicitud->delete();
 
-        return response()->json(['msg' => 'Solicitud eliminada correctamente']);
+        return response()->json(['msg' => 'Registro y archivos eliminados de GCS']);
+    }
+
+    // ----------------------------------------------------------------
+    // EXTRA: OBTENER URL FIRMADA (GCS)
+    // ----------------------------------------------------------------
+    public function getFileUrl(Request $request, SolicitudApoyo $solicitud)
+    {
+        $request->validate(['type' => 'required|string|in:adjunto,firmado,entrega,conocimiento']);
+
+        $path = null;
+        switch ($request->type) {
+            case 'adjunto': $path = $solicitud->path_documento_adjunto; break;
+            case 'firmado': $path = $solicitud->path_documento_firmado; break;
+            case 'entrega': $path = $solicitud->path_foto_entrega; break;
+            case 'conocimiento': $path = $solicitud->path_foto_conocimiento; break;
+        }
+
+        if (!$path) {
+            return response()->json(['error' => 'Archivo no encontrado'], 404);
+        }
+
+        // Genera URL temporal (15 minutos)
+        $url = Storage::disk($this->disk)->temporaryUrl(
+            $path,
+            now()->addMinutes(15)
+        );
+
+        return response()->json(['url' => $url]);
     }
 }

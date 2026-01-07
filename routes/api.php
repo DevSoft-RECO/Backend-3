@@ -27,7 +27,9 @@ Route::middleware('sso')->group(function () {
 Route::middleware('sso')->group(function () {
 
     // Generic CRUD
+    Route::get('/solicitudes/{solicitud}/file-url', [SolicitudController::class, 'getFileUrl']); // Added this route
     Route::get('/solicitudes', [SolicitudController::class, 'index']);
+    Route::get('/tipos-apoyo', [TipoApoyoController::class, 'index']); // Moved here
     Route::post('/solicitudes', [SolicitudController::class, 'store']);
     Route::put('/solicitudes/{solicitud}', [SolicitudController::class, 'update']);
     Route::delete('/solicitudes/{solicitud}', [SolicitudController::class, 'destroy']);
