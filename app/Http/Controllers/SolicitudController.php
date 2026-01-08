@@ -17,7 +17,7 @@ class SolicitudController extends Controller
     // ----------------------------------------------------------------
     public function index(Request $request)
     {
-        $query = SolicitudApoyo::query();
+        $query = SolicitudApoyo::with(['comunidad', 'tipoApoyo']);
 
         // Filtro por rango de fecha de evento (Urgency)
         if ($request->filled('fecha_inicio')) {
