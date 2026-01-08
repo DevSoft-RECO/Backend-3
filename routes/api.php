@@ -4,6 +4,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\SolicitudController;
 use App\Http\Controllers\LocalidadController;
+use App\Http\Controllers\TipoApoyoController;
 
 // Asegúrate de que el middleware 'sso' esté registrado en bootstrap/app.php
 Route::middleware('sso')->group(function () {
@@ -19,12 +20,8 @@ Route::middleware('sso')->group(function () {
     Route::post('/comunidades', [LocalidadController::class, 'storeComunidad']);
 
     // --- TIPOS DE APOYO ---
-    Route::get('/tipos-apoyo', [App\Http\Controllers\TipoApoyoController::class, 'index']);
-    Route::post('/tipos-apoyo', [App\Http\Controllers\TipoApoyoController::class, 'store']);
-
-});
-
-Route::middleware('sso')->group(function () {
+    Route::get('/tipos-apoyo', [TipoApoyoController::class, 'index']);
+    Route::post('/tipos-apoyo', [TipoApoyoController::class, 'store']);
 
     // Generic CRUD
     Route::get('/solicitudes/{solicitud}/file-url', [SolicitudController::class, 'getFileUrl']); // Added this route
@@ -36,7 +33,8 @@ Route::middleware('sso')->group(function () {
 
     // Etapa 2
     Route::put('/solicitudes/{solicitud}/gestionar', [SolicitudController::class, 'gestionar']);
-
+    // Etapa 2.1
+    Route::put('/solicitudes/{solicitud}/reactivar', [SolicitudController::class, 'reactivar']);
     // Etapa 3
     Route::post('/solicitudes/{solicitud}/aprobar', [SolicitudController::class, 'aprobar']);
     // Nota: Usamos POST en 'aprobar' y 'finalizar' porque enviamos archivos (Laravel a veces da problemas con archivos en PUT/PATCH)

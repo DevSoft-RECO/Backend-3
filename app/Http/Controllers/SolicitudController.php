@@ -181,6 +181,23 @@ class SolicitudController extends Controller
         return response()->json(['msg' => 'Solicitud Rechazada']);
     }
 
+    public function reactivar(Request $request, SolicitudApoyo $solicitud)
+    {
+        try {
+            // Se asume validación de Rol/Permiso en Frontend/Token (Mother App)
+
+            $solicitud->update([
+                'estado' => EstadoSolicitud::Solicitado,
+                'motivo_rechazo' => null,
+                'fecha_rechazo' => null,
+            ]);
+
+            return response()->json(['msg' => 'Solicitud Reactivada']);
+        } catch (\Throwable $th) {
+            return response()->json(['error' => $th->getMessage(), 'trace' => $th->getTraceAsString()], 500);
+        }
+    }
+
     // ----------------------------------------------------------------
     // ADMIN: EDITAR (Modificación directa)
     // ----------------------------------------------------------------
@@ -198,9 +215,11 @@ class SolicitudController extends Controller
             'fecha_solicitud' => 'nullable|date',
             'fecha_evento' => 'nullable|date',
             'nombre_solicitante' => 'nullable|string',
+            'nombre_contacto' => 'nullable|string',
             'telefono' => 'nullable|string',
             'monto' => 'nullable|numeric',
             'comentario_solicitud' => 'nullable|string',
+            'comentario_gestion' => 'nullable|string',
             'documento_adjunto' => 'nullable|file|mimes:pdf|max:5120',
         ]);
 
