@@ -10,12 +10,12 @@ class SolicitudApoyo extends Model
     protected $table = 'solicitudes_apoyo';
 
     protected $fillable = [
-        'estado', 'motivo_rechazo',
+        'estado', 'motivo_rechazo', 'fecha_rechazo',
         'fecha_solicitud', 'fecha_evento', 'nombre_solicitante', 'telefono',
         'nombre_contacto', 'comunidad_id', 'comentario_solicitud', 'path_documento_adjunto',
         'usuario_creacion_id', 'agencia_id',
-        'comentario_gestion', 'usuario_gestion_id',
-        'responsable_asignado', 'path_documento_firmado', 'monto', 'tipo_apoyo_id', 'usuario_aprobacion_id',
+        'comentario_gestion', 'usuario_gestion_id', 'fecha_inicio_gestion',
+        'responsable_asignado', 'path_documento_firmado', 'monto', 'tipo_apoyo_id', 'usuario_aprobacion_id', 'fecha_aprobacion',
         'path_foto_entrega', 'path_foto_conocimiento'
     ];
 
@@ -23,6 +23,9 @@ class SolicitudApoyo extends Model
         'estado' => EstadoSolicitud::class, // Casteo automático al Enum
         'fecha_solicitud' => 'date',
         'fecha_evento' => 'date',
+        'fecha_inicio_gestion' => 'datetime',
+        'fecha_aprobacion' => 'datetime',
+        'fecha_rechazo' => 'datetime',
     ];
 
     // Relaciones

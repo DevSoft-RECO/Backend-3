@@ -17,7 +17,7 @@ class SolicitudController extends Controller
     // ----------------------------------------------------------------
     public function index(Request $request)
     {
-        $query = SolicitudApoyo::with(['comunidad', 'tipoApoyo']);
+        $query = SolicitudApoyo::with(['comunidad.municipio', 'tipoApoyo']);
 
         // Filtro por rango de fecha de evento (Urgency)
         if ($request->filled('fecha_inicio')) {
@@ -65,8 +65,10 @@ class SolicitudController extends Controller
             'documento_adjunto' => 'required|file|mimes:pdf|max:5120',
         ]);
 
-        // CAMBIO: Usamos el disco 'gcs' en lugar de 'public'
-        $path = $request->file('documento_adjunto')->store('solicitudes/iniciales', $this->disk);
+        // CAMBIO: Usamos el disco 'gcs' en lugar de 'public', carpeta 'mercadeo' y nombre original con prefijo
+        $file = $request->file('documento_adjunto');
+        $filename = uniqid() . '_' . $file->getClientOriginalName();
+        $path = $file->storeAs('mercadeo/solicitudes/iniciales', $filename, $this->disk);
 
         $user = $request->user();
 
@@ -96,6 +98,7 @@ class SolicitudController extends Controller
         $solicitud->update([
             'comentario_gestion' => $request->comentario_gestion,
             'usuario_gestion_id' => $request->user()->id, // Auditoría
+            'fecha_inicio_gestion' => now(), // Analítica
             'estado' => EstadoSolicitud::EnGestion,
         ]);
 
@@ -114,8 +117,10 @@ class SolicitudController extends Controller
             'documento_firmado' => 'required|file|mimes:pdf|max:5120',
         ]);
 
-        // CAMBIO: Guardamos en 'gcs'
-        $path = $request->file('documento_firmado')->store('solicitudes/firmados', $this->disk);
+        // CAMBIO: Guardamos en 'gcs' dentro de 'mercadeo'
+        $file = $request->file('documento_firmado');
+        $filename = uniqid() . '_' . $file->getClientOriginalName();
+        $path = $file->storeAs('mercadeo/solicitudes/firmados', $filename, $this->disk);
 
         $solicitud->update([
             'responsable_asignado' => $request->responsable_asignado,
@@ -123,6 +128,7 @@ class SolicitudController extends Controller
             'monto' => $request->monto,
             'path_documento_firmado' => $path,
             'usuario_aprobacion_id' => $request->user()->id,
+            'fecha_aprobacion' => now(), // Analítica
             'estado' => EstadoSolicitud::Aprobado,
         ]);
 
@@ -143,9 +149,12 @@ class SolicitudController extends Controller
             'foto_conocimiento' => 'required|image|max:2048',
         ]);
 
-        // CAMBIO: Fotos enviadas directo a la nube
-        $pathEntrega = $request->file('foto_entrega')->store('evidencias', $this->disk);
-        $pathConocimiento = $request->file('foto_conocimiento')->store('evidencias', $this->disk);
+        // CAMBIO: Fotos enviadas directo a la nube carpeta 'mercadeo'
+        $fileEntrega = $request->file('foto_entrega');
+        $pathEntrega = $fileEntrega->storeAs('mercadeo/evidencias', uniqid() . '_' . $fileEntrega->getClientOriginalName(), $this->disk);
+
+        $fileConocimiento = $request->file('foto_conocimiento');
+        $pathConocimiento = $fileConocimiento->storeAs('mercadeo/evidencias', uniqid() . '_' . $fileConocimiento->getClientOriginalName(), $this->disk);
 
         $solicitud->update([
             'path_foto_entrega' => $pathEntrega,
@@ -166,6 +175,7 @@ class SolicitudController extends Controller
         $solicitud->update([
             'estado' => EstadoSolicitud::Rechazado,
             'motivo_rechazo' => $request->motivo_rechazo,
+            'fecha_rechazo' => now(), // Analítica
         ]);
 
         return response()->json(['msg' => 'Solicitud Rechazada']);
@@ -201,7 +211,9 @@ class SolicitudController extends Controller
             if ($solicitud->path_documento_adjunto) {
                 Storage::disk($this->disk)->delete($solicitud->path_documento_adjunto);
             }
-            $dataToUpdate['path_documento_adjunto'] = $request->file('documento_adjunto')->store('solicitudes/iniciales', $this->disk);
+            $file = $request->file('documento_adjunto');
+            $filename = uniqid() . '_' . $file->getClientOriginalName();
+            $dataToUpdate['path_documento_adjunto'] = $file->storeAs('mercadeo/solicitudes/iniciales', $filename, $this->disk);
         }
 
         $solicitud->update($dataToUpdate);

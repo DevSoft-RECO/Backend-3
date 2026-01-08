@@ -18,6 +18,7 @@ return new class extends Migration
             // Enum: SOLICITADO, EN_GESTION, APROBADO, FINALIZADO, RECHAZADO
             $table->string('estado')->default('SOLICITADO')->index();
             $table->text('motivo_rechazo')->nullable();
+            $table->timestamp('fecha_rechazo')->nullable(); // Analítica
 
             // --- ETAPA 1: SOLICITUD (Datos de entrada) ---
             $table->date('fecha_solicitud');
@@ -40,6 +41,7 @@ return new class extends Migration
             // --- ETAPA 2: GESTIÓN (Revisión) ---
             $table->text('comentario_gestion')->nullable();
             $table->unsignedBigInteger('usuario_gestion_id')->nullable(); // ID externo
+            $table->timestamp('fecha_inicio_gestion')->nullable(); // Analítica
 
             // --- ETAPA 3: APROBACIÓN (Formalización) ---
             $table->string('responsable_asignado')->nullable();
@@ -48,6 +50,7 @@ return new class extends Migration
             $table->foreignId('tipo_apoyo_id')->nullable()->constrained('tipos_apoyo');
 
             $table->unsignedBigInteger('usuario_aprobacion_id')->nullable(); // ID externo
+            $table->timestamp('fecha_aprobacion')->nullable(); // Analítica
 
             // --- ETAPA 4: FINALIZACIÓN (Evidencias) ---
             $table->string('path_foto_entrega')->nullable();
