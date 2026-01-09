@@ -5,6 +5,8 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\SolicitudController;
 use App\Http\Controllers\LocalidadController;
 use App\Http\Controllers\TipoApoyoController;
+use App\Http\Controllers\FacturaController;
+use App\Http\Controllers\CategoriaFacturaController;
 
 // Asegúrate de que el middleware 'sso' esté registrado en bootstrap/app.php
 Route::middleware('sso')->group(function () {
@@ -44,4 +46,10 @@ Route::middleware('sso')->group(function () {
 
     // Rechazo
     Route::put('/solicitudes/{solicitud}/rechazar', [SolicitudController::class, 'rechazar']);
+
+    // --- MÓDULO FACTURAS ---
+    Route::apiResource('categorias-facturas', CategoriaFacturaController::class);
+
+    Route::get('/facturas/export/csv', [FacturaController::class, 'exportCsv']);
+    Route::apiResource('facturas', FacturaController::class);
 });
