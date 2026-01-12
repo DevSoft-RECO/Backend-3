@@ -22,6 +22,22 @@ class LocalidadController extends Controller
         return response()->json($depto, 201);
     }
 
+    public function updateDepartamento(Request $request, Departamento $departamento)
+    {
+        $request->validate(['nombre' => 'required|string|unique:departamentos,nombre,'.$departamento->id]);
+        $departamento->update(['nombre' => $request->nombre]);
+        return response()->json($departamento);
+    }
+
+    public function destroyDepartamento(Departamento $departamento)
+    {
+        if ($departamento->municipios()->exists()) {
+             return response()->json(['error' => 'No se puede eliminar: Tiene municipios asociados.'], 409);
+        }
+        $departamento->delete();
+        return response()->json(['message' => 'Departamento eliminado']);
+    }
+
     // --- MUNICIPIOS ---
     public function indexMunicipios(Request $request)
     {
@@ -42,6 +58,22 @@ class LocalidadController extends Controller
         return response()->json($muni, 201);
     }
 
+    public function updateMunicipio(Request $request, Municipio $municipio)
+    {
+        $request->validate(['nombre' => 'required|string']);
+        $municipio->update(['nombre' => $request->nombre]);
+        return response()->json($municipio);
+    }
+
+    public function destroyMunicipio(Municipio $municipio)
+    {
+        if ($municipio->comunidades()->exists()) {
+             return response()->json(['error' => 'No se puede eliminar: Tiene comunidades asociadas.'], 409);
+        }
+        $municipio->delete();
+        return response()->json(['message' => 'Municipio eliminado']);
+    }
+
     // --- COMUNIDADES ---
     public function indexComunidades(Request $request)
     {
@@ -60,5 +92,22 @@ class LocalidadController extends Controller
         ]);
         $comu = Comunidad::create($data);
         return response()->json($comu, 201);
+    }
+
+    public function updateComunidad(Request $request, Comunidad $comunidad)
+    {
+        $request->validate(['nombre' => 'required|string']);
+        $comunidad->update(['nombre' => $request->nombre]);
+        return response()->json($comunidad);
+    }
+
+    public function destroyComunidad(Comunidad $comunidad)
+    {
+        // Verificar uso en solicitudes (si existe la relación)
+        if ($comunidad->solicitudes()->exists()) {
+             return response()->json(['error' => 'No se puede eliminar: Tiene solicitudes asociadas.'], 409);
+        }
+        $comunidad->delete();
+        return response()->json(['message' => 'Comunidad eliminada']);
     }
 }

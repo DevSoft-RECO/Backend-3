@@ -14,12 +14,18 @@ Route::middleware('sso')->group(function () {
     // --- LOCALIDADES ---
     Route::get('/departamentos', [LocalidadController::class, 'indexDepartamentos']);
     Route::post('/departamentos', [LocalidadController::class, 'storeDepartamento']);
+    Route::put('/departamentos/{departamento}', [LocalidadController::class, 'updateDepartamento']);
+    Route::delete('/departamentos/{departamento}', [LocalidadController::class, 'destroyDepartamento']);
 
     Route::get('/municipios', [LocalidadController::class, 'indexMunicipios']);
     Route::post('/municipios', [LocalidadController::class, 'storeMunicipio']);
+    Route::put('/municipios/{municipio}', [LocalidadController::class, 'updateMunicipio']);
+    Route::delete('/municipios/{municipio}', [LocalidadController::class, 'destroyMunicipio']);
 
     Route::get('/comunidades', [LocalidadController::class, 'indexComunidades']);
     Route::post('/comunidades', [LocalidadController::class, 'storeComunidad']);
+    Route::put('/comunidades/{comunidad}', [LocalidadController::class, 'updateComunidad']);
+    Route::delete('/comunidades/{comunidad}', [LocalidadController::class, 'destroyComunidad']);
 
     // --- TIPOS DE APOYO ---
     Route::get('/tipos-apoyo', [TipoApoyoController::class, 'index']);
