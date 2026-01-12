@@ -88,21 +88,33 @@ class SolicitudController extends Controller
     // ----------------------------------------------------------------
     public function gestionar(Request $request, SolicitudApoyo $solicitud)
     {
-        // Validar que no esté ya finalizada o rechazada
-        if ($solicitud->estado === EstadoSolicitud::Rechazado || $solicitud->estado === EstadoSolicitud::Finalizado) {
-             return response()->json(['error' => 'Solicitud cerrada'], 400);
+        try {
+            // Validar que no esté ya finalizada o rechazada
+            if ($solicitud->estado === EstadoSolicitud::Rechazado || $solicitud->estado === EstadoSolicitud::Finalizado) {
+                 return response()->json(['error' => 'Solicitud cerrada'], 400);
+            }
+
+            $request->validate(['comentario_gestion' => 'required|string']);
+
+            $user = $request->user();
+            // Prioridad: Nombre enviado desde Frontend > Objeto User > Username > Fallback
+            $userName = $request->input('nombre_usuario')
+                ?? $user->name
+                ?? $user->username
+                ?? 'Usuario ' . $user->id;
+
+            $solicitud->update([
+                'comentario_gestion' => $request->comentario_gestion,
+                'usuario_gestion_id' => $user->id, // Auditoría
+                'nombre_usuario_gestion' => $userName,
+                'fecha_inicio_gestion' => now(), // Analítica
+                'estado' => EstadoSolicitud::EnGestion,
+            ]);
+
+            return response()->json(['msg' => 'Solicitud en etapa de gestión']);
+        } catch (\Throwable $th) {
+            return response()->json(['error' => $th->getMessage(), 'file' => $th->getFile(), 'line' => $th->getLine()], 500);
         }
-
-        $request->validate(['comentario_gestion' => 'required|string']);
-
-        $solicitud->update([
-            'comentario_gestion' => $request->comentario_gestion,
-            'usuario_gestion_id' => $request->user()->id, // Auditoría
-            'fecha_inicio_gestion' => now(), // Analítica
-            'estado' => EstadoSolicitud::EnGestion,
-        ]);
-
-        return response()->json(['msg' => 'Solicitud en etapa de gestión']);
     }
 
     // ----------------------------------------------------------------
@@ -110,29 +122,40 @@ class SolicitudController extends Controller
     // ----------------------------------------------------------------
     public function aprobar(Request $request, SolicitudApoyo $solicitud)
     {
-        $request->validate([
-            'responsable_asignado' => 'required|string',
-            'tipo_apoyo_id' => 'required|exists:tipos_apoyo,id',
-            'monto' => 'nullable|numeric',
-            'documento_firmado' => 'required|file|mimes:pdf|max:5120',
-        ]);
+        try {
+            $request->validate([
+                'responsable_asignado' => 'required|string',
+                'tipo_apoyo_id' => 'required|exists:tipos_apoyo,id',
+                'monto' => 'nullable|numeric',
+                'documento_firmado' => 'required|file|mimes:pdf|max:5120',
+            ]);
 
-        // CAMBIO: Guardamos en 'gcs' dentro de 'mercadeo'
-        $file = $request->file('documento_firmado');
-        $filename = uniqid() . '_' . $file->getClientOriginalName();
-        $path = $file->storeAs('mercadeo/solicitudes/firmados', $filename, $this->disk);
+            // CAMBIO: Guardamos en 'gcs' dentro de 'mercadeo'
+            $file = $request->file('documento_firmado');
+            $filename = uniqid() . '_' . $file->getClientOriginalName();
+            $path = $file->storeAs('mercadeo/solicitudes/firmados', $filename, $this->disk);
 
-        $solicitud->update([
-            'responsable_asignado' => $request->responsable_asignado,
-            'tipo_apoyo_id' => $request->tipo_apoyo_id,
-            'monto' => $request->monto,
-            'path_documento_firmado' => $path,
-            'usuario_aprobacion_id' => $request->user()->id,
-            'fecha_aprobacion' => now(), // Analítica
-            'estado' => EstadoSolicitud::Aprobado,
-        ]);
+            $user = $request->user();
+            $userName = $request->input('nombre_usuario')
+                ?? $user->name
+                ?? $user->username
+                ?? 'Usuario ' . $user->id;
 
-        return response()->json(['msg' => 'Solicitud Aprobada y Formalizada']);
+            $solicitud->update([
+                'responsable_asignado' => $request->responsable_asignado,
+                'tipo_apoyo_id' => $request->tipo_apoyo_id,
+                'monto' => $request->monto,
+                'path_documento_firmado' => $path,
+                'usuario_aprobacion_id' => $user->id,
+                'nombre_usuario_aprobacion' => $userName,
+                'fecha_aprobacion' => now(), // Analítica
+                'estado' => EstadoSolicitud::Aprobado,
+            ]);
+
+            return response()->json(['msg' => 'Solicitud Aprobada y Formalizada']);
+        } catch (\Throwable $th) {
+             return response()->json(['error' => $th->getMessage()], 500);
+        }
     }
 
     // ----------------------------------------------------------------
@@ -170,15 +193,27 @@ class SolicitudController extends Controller
     // ----------------------------------------------------------------
     public function rechazar(Request $request, SolicitudApoyo $solicitud)
     {
-        $request->validate(['motivo_rechazo' => 'required|string|min:5']);
+        try {
+            $request->validate(['motivo_rechazo' => 'required|string|min:5']);
 
-        $solicitud->update([
-            'estado' => EstadoSolicitud::Rechazado,
-            'motivo_rechazo' => $request->motivo_rechazo,
-            'fecha_rechazo' => now(), // Analítica
-        ]);
+            $user = $request->user();
+            $userName = $request->input('nombre_usuario')
+                ?? $user->name
+                ?? $user->username
+                ?? 'Usuario ' . $user->id;
 
-        return response()->json(['msg' => 'Solicitud Rechazada']);
+            $solicitud->update([
+                'estado' => EstadoSolicitud::Rechazado,
+                'motivo_rechazo' => $request->motivo_rechazo,
+                'usuario_rechazo_id' => $user->id,
+                'nombre_usuario_rechazo' => $userName,
+                'fecha_rechazo' => now(), // Analítica
+            ]);
+
+            return response()->json(['msg' => 'Solicitud Rechazada']);
+        } catch (\Throwable $th) {
+             return response()->json(['error' => $th->getMessage()], 500);
+        }
     }
 
     public function reactivar(Request $request, SolicitudApoyo $solicitud)
@@ -189,6 +224,8 @@ class SolicitudController extends Controller
             $solicitud->update([
                 'estado' => EstadoSolicitud::Solicitado,
                 'motivo_rechazo' => null,
+                'usuario_rechazo_id' => null,
+                'nombre_usuario_rechazo' => null,
                 'fecha_rechazo' => null,
             ]);
 
