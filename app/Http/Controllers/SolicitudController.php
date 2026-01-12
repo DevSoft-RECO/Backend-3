@@ -53,6 +53,36 @@ class SolicitudController extends Controller
             $query->where('estado', $request->estado);
         }
 
+        // PERMISOS DE VISUALIZACIÓN
+        // Si NO es Super Admin y NO tiene permiso de ver todo (e.g., admin_mercadeo),
+        // mostrar solo sus propias solicitudes.
+        $user = $request->user();
+
+        // Asumiendo Spatie o lógica simple de roles/permisos en User model
+        // Si no usas paquete de permisos, verifica tu implementación de hasRole/hasPermissionTo
+        // Aquí usaremos la lógica genérica que mencionaste (Super Admin ve todo).
+        // Ajusta 'admin_mercadeo' si es el permiso correcto para "Ver Todo".
+
+        // Helper safely check array
+        $roles = $user->roles ?? [];
+        $permissions = $user->permissions ?? [];
+
+        $checkRole = function($haystack, $needle) {
+            return is_array($haystack) && !empty(array_filter($haystack, function($item) use ($needle) {
+                return strtolower($item) === strtolower($needle);
+            }));
+        };
+
+        $isSuperAdmin = $checkRole($roles, 'Super Admin');
+        $hasAdminPermission = $checkRole($permissions, 'admin_mercadeo');
+
+        // Filtro obligarorios:
+        // 1. Si el cliente solicita explícitamente "own" (Mis Solicitudes).
+        // 2. Si el usuario NO tiene permisos de admin (Super Admin o admin_mercadeo).
+        if ($request->boolean('own') || (!$isSuperAdmin && !$hasAdminPermission)) {
+            $query->where('usuario_creacion_id', $user->id);
+        }
+
         return response()->json($query->paginate(20)->through(function ($item) {
             $disk = Storage::disk($this->disk);
             $ttl = now()->addMinutes(20);

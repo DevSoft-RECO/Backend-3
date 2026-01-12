@@ -8,6 +8,7 @@ use Symfony\Component\HttpFoundation\Response;
 use Firebase\JWT\JWT;
 use Firebase\JWT\Key;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Auth\GenericUser;
 
 class ValidateSSO
@@ -33,11 +34,26 @@ class ValidateSSO
             // Decodificar Token con RS256
             $decoded = JWT::decode($token, new Key($publicKey, 'RS256'));
 
-            // Inyectar usuario en la sesión de Laravel (Memoria)
-            $user = new GenericUser([
-                'id' => $decoded->sub,
-                'token_scopes' => $decoded->scopes ?? [],
-            ]);
+            // El token NO contiene roles/permisos. Debemos pedirlos a la App Madre.
+            // URL de la madre (Backend port 8000)
+            $motherUrl = env('MOTHER_API_URL', 'http://localhost:8000');
+
+            // Hacemos petición a la madre usando el mismo token
+            $response = Http::withToken($token)
+                ->get("{$motherUrl}/api/me"); // Frontend usa /api/me. Backend AuthController tiene user(), ruta asumo /me o /user.
+
+            if ($response->successful()) {
+                $userData = $response->json();
+                // $userData trae 'roles' => [...], 'permissions' => [...]
+                $userData['id'] = $decoded->sub;
+                $user = new GenericUser($userData);
+            } else {
+                // Si falla (ej. red), fallback a datos minimos del token (sin roles)
+                $userData = (array) $decoded;
+                $userData['id'] = $decoded->sub;
+                $user = new GenericUser($userData);
+                // Opcional: Log warning
+            }
 
             Auth::setUser($user);
 
