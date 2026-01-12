@@ -21,16 +21,20 @@ class CategoriaFacturaController extends Controller
         return response()->json(['msg' => 'Categoría creada', 'data' => $cat], 201);
     }
 
-    public function update(Request $request, CategoriaFactura $categoria)
+    public function update(Request $request, $id)
     {
+        $categoria = CategoriaFactura::findOrFail($id);
+
         $request->validate(['nombre' => 'required|string|max:255']);
 
         $categoria->update($request->all());
         return response()->json(['msg' => 'Categoría actualizada', 'data' => $categoria]);
     }
 
-    public function destroy(CategoriaFactura $categoria)
+    public function destroy($id)
     {
+        $categoria = CategoriaFactura::findOrFail($id);
+
         // Opcional: Validar si tiene facturas asociadas antes de borrar
         if ($categoria->facturas()->exists()) {
             return response()->json(['error' => 'No se puede eliminar porque tiene facturas asociadas.'], 409);
