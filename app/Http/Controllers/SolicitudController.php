@@ -19,6 +19,23 @@ class SolicitudController extends Controller
     {
         $query = SolicitudApoyo::with(['comunidad.municipio', 'tipoApoyo']);
 
+        // Filtro INDEPENDIENTE por ID
+        if ($request->filled('id')) {
+            $query->where('id', $request->id);
+            // Si buscamos por ID, ignoramos fechas y estados para encontrarlo directo
+            return response()->json($query->paginate(20)->through(function ($item) {
+                $disk = Storage::disk($this->disk);
+                $ttl = now()->addMinutes(20);
+
+                $item->url_documento_adjunto = $item->path_documento_adjunto ? $disk->temporaryUrl($item->path_documento_adjunto, $ttl) : null;
+                $item->url_documento_firmado = $item->path_documento_firmado ? $disk->temporaryUrl($item->path_documento_firmado, $ttl) : null;
+                $item->url_foto_entrega = $item->path_foto_entrega ? $disk->temporaryUrl($item->path_foto_entrega, $ttl) : null;
+                $item->url_foto_conocimiento = $item->path_foto_conocimiento ? $disk->temporaryUrl($item->path_foto_conocimiento, $ttl) : null;
+
+                return $item;
+            }));
+        }
+
         // Filtro por rango de fecha de evento (Urgency)
         if ($request->filled('fecha_inicio')) {
             $query->whereDate('fecha_evento', '>=', $request->fecha_inicio);

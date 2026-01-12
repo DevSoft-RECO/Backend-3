@@ -7,9 +7,13 @@ use App\Http\Controllers\LocalidadController;
 use App\Http\Controllers\TipoApoyoController;
 use App\Http\Controllers\FacturaController;
 use App\Http\Controllers\CategoriaFacturaController;
+use App\Http\Controllers\DashboardController;
 
 // Asegúrate de que el middleware 'sso' esté registrado en bootstrap/app.php
 Route::middleware('sso')->group(function () {
+
+    // --- DASHBOARD ---
+    Route::get('/dashboard', [DashboardController::class, 'index']);
 
     // --- LOCALIDADES ---
     Route::get('/departamentos', [LocalidadController::class, 'indexDepartamentos']);
