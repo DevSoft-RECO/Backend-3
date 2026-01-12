@@ -86,51 +86,55 @@ class FacturaController extends Controller
     }
 
     // Exportar CSV
-    public function exportCsv(Request $request)
-    {
-        // Replicamos los filtros para exportar lo que se ve (o todo)
-        $query = Factura::with('categoria');
 
-        if ($request->filled('search')) {
-            $search = $request->search;
-            $query->where(function ($q) use ($search) {
-                $q->where('numero_factura', 'like', "%{$search}%")
-                  ->orWhere('numero_serie', 'like', "%{$search}%");
-            });
-        } elseif ($request->filled('numero')) {
-            $query->where('numero_factura', 'like', "%{$request->numero}%");
-        }
 
-        if ($request->filled('fecha_inicio')) {
-            $query->whereDate('fecha_factura', '>=', $request->fecha_inicio);
-        }
+public function exportCsv(Request $request)
+{
+    $query = Factura::with('categoria');
 
-        if ($request->filled('fecha_fin')) {
-            $query->whereDate('fecha_factura', '<=', $request->fecha_fin);
-        }
+    if ($request->filled('search')) {
+        $search = $request->search;
+        $query->where(function ($q) use ($search) {
+            $q->where('numero_factura', 'like', "%{$search}%")
+              ->orWhere('numero_serie', 'like', "%{$search}%");
+        });
+    }
 
-        $facturas = $query->get(); // Obtener todo para CSV (cuidadado con memoria si son millones, chunks es mejor)
+    if ($request->filled('fecha_inicio')) {
+        $query->whereDate('fecha_factura', '>=', $request->fecha_inicio);
+    }
 
-        $filename = "facturas_" . date('Ymd_His') . ".csv";
+    if ($request->filled('fecha_fin')) {
+        $query->whereDate('fecha_factura', '<=', $request->fecha_fin);
+    }
 
-        $headers = [
-            "Content-type" => "text/csv",
-            "Content-Disposition" => "attachment; filename=$filename",
-            "Pragma" => "no-cache",
-            "Cache-Control" => "must-revalidate, post-check=0, pre-check=0",
-            "Expires" => "0"
-        ];
+    $filename = 'facturas_' . now()->format('Ymd_His') . '.csv';
 
-        $callback = function() use ($facturas) {
-            $file = fopen('php://output', 'w');
+    $headers = [
+        'Content-Type'        => 'text/csv; charset=Windows-1252',
+        'Content-Disposition' => "attachment; filename=\"$filename\"",
+        'Cache-Control'       => 'no-store, no-cache',
+    ];
 
-            // Encabezados CSV
-            fputcsv($file, [
-                'ID', 'No. Factura', 'Serie', 'Categoría', 'Fecha', 'Monto', 'Emisor', 'NIT', 'Descripción'
-            ]);
+    $callback = function () use ($query) {
+        $file = fopen('php://output', 'w');
 
+        // Encabezados
+        fputcsv($file, $this->encodeRow([
+            'ID',
+            'No. Factura',
+            'Serie',
+            'Categoría',
+            'Fecha',
+            'Monto',
+            'Emisor',
+            'NIT',
+            'Descripción'
+        ]));
+
+        $query->chunk(500, function ($facturas) use ($file) {
             foreach ($facturas as $f) {
-                fputcsv($file, [
+                fputcsv($file, $this->encodeRow([
                     $f->id,
                     $f->numero_factura,
                     $f->numero_serie,
@@ -139,12 +143,27 @@ class FacturaController extends Controller
                     $f->monto,
                     $f->nombre_emisor,
                     $f->nit_emisor,
-                    $f->descripcion
-                ]);
+                    $f->descripcion,
+                ]));
             }
-            fclose($file);
-        };
+        });
 
-        return new StreamedResponse($callback, 200, $headers);
-    }
+        fclose($file);
+    };
+
+    return new StreamedResponse($callback, 200, $headers);
+}
+
+/**
+ * Convierte cada valor a Windows-1252 para Excel
+ */
+private function encodeRow(array $row): array
+{
+    return array_map(function ($value) {
+        return is_string($value)
+            ? mb_convert_encoding($value, 'Windows-1252', 'UTF-8')
+            : $value;
+    }, $row);
+}
+
 }
