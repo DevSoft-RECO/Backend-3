@@ -13,13 +13,26 @@ class FacturaController extends Controller
     {
         $query = Factura::with('categoria:id,nombre');
 
-        if ($request->filled('numero')) {
-            $query->where('numero_factura', 'like', "%{$request->numero}%");
+        // Búsqueda general por numero o serie
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('numero_factura', 'like', "%{$search}%")
+                  ->orWhere('numero_serie', 'like', "%{$search}%");
+            });
+        }
+        // Filtros específicos (opcional, si se usaran por separado)
+        elseif ($request->filled('numero')) {
+             $query->where('numero_factura', 'like', "%{$request->numero}%");
         }
 
-        if ($request->filled('serie')) {
+        /*
+        // Eliminamos el filtro estricto de serie si usamos search,
+        // o lo dejamos como 'AND' solo si no hay 'search'
+        if ($request->filled('serie') && !$request->filled('search')) {
             $query->where('numero_serie', 'like', "%{$request->serie}%");
         }
+        */
 
         if ($request->filled('fecha_inicio')) {
             $query->whereDate('fecha_factura', '>=', $request->fecha_inicio);
@@ -78,10 +91,23 @@ class FacturaController extends Controller
         // Replicamos los filtros para exportar lo que se ve (o todo)
         $query = Factura::with('categoria');
 
-        if ($request->filled('numero')) {
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('numero_factura', 'like', "%{$search}%")
+                  ->orWhere('numero_serie', 'like', "%{$search}%");
+            });
+        } elseif ($request->filled('numero')) {
             $query->where('numero_factura', 'like', "%{$request->numero}%");
         }
-        // ... otros filtros si se desean ...
+
+        if ($request->filled('fecha_inicio')) {
+            $query->whereDate('fecha_factura', '>=', $request->fecha_inicio);
+        }
+
+        if ($request->filled('fecha_fin')) {
+            $query->whereDate('fecha_factura', '<=', $request->fecha_fin);
+        }
 
         $facturas = $query->get(); // Obtener todo para CSV (cuidadado con memoria si son millones, chunks es mejor)
 
