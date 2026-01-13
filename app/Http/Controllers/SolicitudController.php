@@ -419,7 +419,9 @@ class SolicitudController extends Controller
             fputcsv($file, [
                 'ID',
                 'Agencia ID',
+                'Usuario Creación',
                 'Estado',
+                'FechaCreado',
                 'Fecha Solicitud',
                 'Fecha Evento',
                 'Nombre Solicitante',
@@ -451,7 +453,10 @@ class SolicitudController extends Controller
             foreach ($solicitudes as $s) {
                 fputcsv($file, [
                     $s->id,
-                    $s->estado->value,
+                    $s->agencia_id,         // Matches 'Agencia ID' header
+                    $s->usuario_creacion,   // Matches 'Usuario Creación' header
+                    $s->estado->value,      // Matches 'Estado' header
+                    $s->created_at,
                     $s->fecha_solicitud,
                     $s->fecha_evento,
                     $s->nombre_solicitante,
@@ -476,7 +481,6 @@ class SolicitudController extends Controller
                     $s->path_documento_firmado ? 'Sí' : 'No',
                     $s->path_foto_entrega ? 'Sí' : 'No',
                     $s->path_foto_conocimiento ? 'Sí' : 'No',
-                    $s->created_at,
                     $s->updated_at
                 ]);
             }
