@@ -130,7 +130,7 @@ class SolicitudController extends Controller
         $solicitud = SolicitudApoyo::create([
             ...$data,
             'path_documento_adjunto' => $path,
-            'usuario_creacion' => $user->name ?? $user->username ?? 'Usuario ' . $user->id,
+            'usuario_creacion' => $user->username ?? $user->name ?? 'Usuario ' . $user->id,
             'agencia_id' => $user->idagencia ?? 1, // Usamos idagencia del token
             'estado' => EstadoSolicitud::Solicitado,
         ]);
@@ -298,7 +298,7 @@ class SolicitudController extends Controller
         // Restricción para el Creador: Solo editar si está en SOLICITADO
         // Restricción para el Creador: Solo editar si está en SOLICITADO
         // Comparamos nombres de usuario
-        $currentUserName = $request->user()->name ?? $request->user()->username ?? 'Usuario ' . $request->user()->id;
+        $currentUserName = $request->user()->username ?? $request->user()->name ?? 'Usuario ' . $request->user()->id;
 
         if ($currentUserName === $solicitud->usuario_creacion) {
             if ($solicitud->estado !== EstadoSolicitud::Solicitado) {
