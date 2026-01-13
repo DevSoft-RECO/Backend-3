@@ -36,7 +36,7 @@ class ValidateSSO
 
             // El token NO contiene roles/permisos. Debemos pedirlos a la App Madre.
             // URL de la madre (Backend port 8000)
-            $motherUrl = env('MOTHER_API_URL', 'http://localhost:8000');
+            $motherUrl = env('APP_MADRE_URL', 'http://localhost:8000');
 
             // Hacemos petición a la madre usando el mismo token
             $response = Http::withToken($token)
