@@ -42,7 +42,9 @@ class FacturaController extends Controller
             $query->whereDate('fecha_factura', '<=', $request->fecha_fin);
         }
 
-        return $query->latest()->paginate(20);
+        // Paginación: 10 por defecto para rapidez, o el valor solicitado
+        $perPage = $request->input('per_page', 10);
+        return $query->latest()->paginate($perPage);
     }
 
     public function store(Request $request)
