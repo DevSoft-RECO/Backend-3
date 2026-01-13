@@ -412,7 +412,9 @@ class SolicitudController extends Controller
             // Encabezados
             fputcsv($file, [
                 'ID',
+                'agencia_id',
                 'Estado',
+                'Creado',
                 'Fecha Solicitud',
                 'Fecha Evento',
                 'Nombre Solicitante',
@@ -437,7 +439,6 @@ class SolicitudController extends Controller
                 'Tiene Doc Firmado',
                 'Tiene Foto Entrega',
                 'Tiene Foto Conocimiento',
-                'Creado',
                 'Actualizado'
             ]);
 
