@@ -221,11 +221,11 @@ class SolicitudController extends Controller
         }
 
         $request->validate([
-            'foto_entrega' => 'required|image|max:2048',
-            'foto_conocimiento' => 'required|image|max:2048',
+            'foto_entrega' => 'required|file|mimes:pdf|max:5120',
+            'foto_conocimiento' => 'required|file|mimes:pdf|max:5120',
         ]);
 
-        // CAMBIO: Fotos enviadas directo a la nube carpeta 'mercadeo'
+        // CAMBIO: Archivos enviados directo a la nube carpeta 'mercadeo'
         $fileEntrega = $request->file('foto_entrega');
         $pathEntrega = $fileEntrega->storeAs('mercadeo/evidencias', uniqid() . '_' . $fileEntrega->getClientOriginalName(), $this->disk);
 
