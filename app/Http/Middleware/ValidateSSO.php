@@ -10,6 +10,7 @@ use Firebase\JWT\Key;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Auth\GenericUser;
+use Exception; // Importar Exception correctamente
 
 class ValidateSSO
 {
@@ -22,42 +23,50 @@ class ValidateSSO
         }
 
         try {
+            // 1. Validar Llave Pública
             $publicKeyPath = storage_path('oauth-public.key');
 
             if (!file_exists($publicKeyPath)) {
-                throw new \Exception("Falta llave pública en servidor hijo");
+                // Loguear el error ayuda mucho más que solo lanzar excepción
+                \Log::error("SSO Error: No se encuentra la llave pública en: " . $publicKeyPath);
+                throw new Exception("Error de configuración del servidor (Llave pública faltante)");
             }
 
             $publicKey = file_get_contents($publicKeyPath);
-            JWT::$leeway = 60; // Margen de error para relojes desincronizados
+            JWT::$leeway = 60;
 
-            // Decodificar Token con RS256
+            // 2. Decodificar Token
             $decoded = JWT::decode($token, new Key($publicKey, 'RS256'));
 
-            // El token NO contiene roles/permisos. Debemos pedirlos a la App Madre.
-            // URL de la madre (Backend port 8000)
-            $motherUrl = env('APP_MADRE_URL', 'http://localhost:8000');
+            // 3. Obtener URL de la Madre (CORRECCIÓN AQUÍ)
+            // Usamos config() en lugar de env() para que funcione en producción
+            // Asegúrate de que config/services.php tenga la entrada 'app_madre'
+            $motherUrl = config('services.app_madre.url');
 
-            // Hacemos petición a la madre usando el mismo token
-            $response = Http::withToken($token)
-                ->get("{$motherUrl}/api/me"); // Frontend usa /api/me. Backend AuthController tiene user(), ruta asumo /me o /user.
+            if (empty($motherUrl)) {
+                throw new Exception("La URL de la App Madre no está configurada en services.php");
+            }
+
+            // 4. Petición a la App Madre
+            $response = Http::withToken($token)->get("{$motherUrl}/api/me");
 
             if ($response->successful()) {
                 $userData = $response->json();
-                // $userData trae 'roles' => [...], 'permissions' => [...]
                 $userData['id'] = $decoded->sub;
                 $user = new GenericUser($userData);
             } else {
-                // Si falla (ej. red), fallback a datos minimos del token (sin roles)
+                // Fallback si la madre no responde (para no bloquear al usuario totalmente)
+                \Log::warning("SSO Warning: No se pudo conectar con App Madre. Usando datos básicos del token.");
                 $userData = (array) $decoded;
                 $userData['id'] = $decoded->sub;
                 $user = new GenericUser($userData);
-                // Opcional: Log warning
             }
 
             Auth::setUser($user);
 
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
+            // Loguear el error real para que lo veas en laravel.log
+            \Log::error("SSO Falló: " . $e->getMessage());
             return response()->json(['message' => 'Acceso Denegado: ' . $e->getMessage()], 401);
         }
 
