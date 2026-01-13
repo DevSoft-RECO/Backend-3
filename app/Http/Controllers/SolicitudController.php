@@ -23,7 +23,7 @@ class SolicitudController extends Controller
         if ($request->filled('id')) {
             $query->where('id', $request->id);
             // Si buscamos por ID, ignoramos fechas y estados para encontrarlo directo
-            return response()->json($query->paginate(20)->through(function ($item) {
+            return response()->json($query->orderBy('created_at', 'desc')->paginate(20)->through(function ($item) {
                 $disk = Storage::disk($this->disk);
                 $ttl = now()->addMinutes(20);
 
@@ -44,9 +44,13 @@ class SolicitudController extends Controller
             $query->whereDate('fecha_evento', '<=', $request->fecha_fin);
         }
 
-        // Ordenar por urgencia (fecha mas proxima primero)
-        // Por defecto ascendente para ver las que estan por vencer
-        $query->orderBy('fecha_evento', 'asc');
+        // Ordenar: Si hay filtros de fecha, ordenar por urgencia (fecha_evento asc)
+        // Si no hay filtros de fecha, ordenar por más reciente (created_at desc)
+        if ($request->filled('fecha_inicio') || $request->filled('fecha_fin')) {
+            $query->orderBy('fecha_evento', 'asc');
+        } else {
+            $query->orderBy('created_at', 'desc');
+        }
 
         // Otros filtros opcionales
         if ($request->filled('estado')) {
@@ -83,7 +87,9 @@ class SolicitudController extends Controller
             $query->where('usuario_creacion_id', $user->id);
         }
 
-        return response()->json($query->paginate(20)->through(function ($item) {
+        // Paginación: 10 por defecto para rapidez, o el valor solicitado
+        $perPage = $request->input('per_page', 10);
+        return response()->json($query->paginate($perPage)->through(function ($item) {
             $disk = Storage::disk($this->disk);
             $ttl = now()->addMinutes(20);
 
