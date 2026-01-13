@@ -81,10 +81,12 @@ class SolicitudController extends Controller
         $hasAdminPermission = $checkRole($permissions, 'admin_mercadeo');
 
         // Filtro obligarorios:
-        // 1. Si el cliente solicita explícitamente "own" (Mis Solicitudes).
-        // 2. Si el usuario NO tiene permisos de admin (Super Admin o admin_mercadeo).
-        if ($request->boolean('own') || (!$isSuperAdmin && !$hasAdminPermission)) {
-            $query->where('usuario_creacion_id', $user->id);
+        // 1. Si el usuario NO tiene permisos de admin (Super Admin o admin_mercadeo), ve solo SU AGENCIA.
+        // 2. Si el cliente solicita explícitamente "own", ve solo SU USUARIO.
+
+        if (!$isSuperAdmin && !$hasAdminPermission) {
+            // Usamos 'idagencia' que viene del token SSO
+            $query->where('agencia_id', $user->idagencia);
         }
 
         // Paginación: 10 por defecto para rapidez, o el valor solicitado
@@ -129,7 +131,7 @@ class SolicitudController extends Controller
             ...$data,
             'path_documento_adjunto' => $path,
             'usuario_creacion_id' => $user->id,
-            'agencia_id' => $user->agencia_id ?? 1,
+            'agencia_id' => $user->idagencia ?? 1, // Usamos idagencia del token
             'estado' => EstadoSolicitud::Solicitado,
         ]);
 
@@ -412,9 +414,8 @@ class SolicitudController extends Controller
             // Encabezados
             fputcsv($file, [
                 'ID',
-                'agencia_id',
+                'Agencia ID',
                 'Estado',
-                'Creado',
                 'Fecha Solicitud',
                 'Fecha Evento',
                 'Nombre Solicitante',
