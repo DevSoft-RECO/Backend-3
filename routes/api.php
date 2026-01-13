@@ -38,6 +38,7 @@ Route::middleware('sso')->group(function () {
     Route::delete('/tipos-apoyo/{tipo}', [TipoApoyoController::class, 'destroy']);
 
     // Generic CRUD
+    Route::get('/solicitudes/export/csv', [SolicitudController::class, 'exportCsv']);
     Route::get('/solicitudes/{solicitud}/file-url', [SolicitudController::class, 'getFileUrl']); // Added this route
     Route::get('/solicitudes', [SolicitudController::class, 'index']);
     Route::get('/tipos-apoyo', [TipoApoyoController::class, 'index']); // Moved here

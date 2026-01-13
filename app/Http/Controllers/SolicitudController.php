@@ -304,6 +304,8 @@ class SolicitudController extends Controller
             'monto' => 'nullable|numeric',
             'comentario_solicitud' => 'nullable|string',
             'comentario_gestion' => 'nullable|string',
+            'responsable_asignado' => 'nullable|string',
+            'tipo_apoyo_id' => 'nullable|exists:tipos_apoyo,id',
             'documento_adjunto' => 'nullable|file|mimes:pdf|max:5120',
         ]);
 
@@ -374,5 +376,102 @@ class SolicitudController extends Controller
         );
 
         return response()->json(['url' => $url]);
+    }
+
+    // ----------------------------------------------------------------
+    // EXPORT: CSV para Analítica
+    // ----------------------------------------------------------------
+    public function exportCsv(Request $request)
+    {
+        $solicitudes = SolicitudApoyo::with(['comunidad.municipio.departamento', 'tipoApoyo'])
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        $filename = 'solicitudes_export_' . now()->format('Y-m-d_His') . '.csv';
+
+        $headers = [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => "attachment; filename=\"{$filename}\"",
+            'Pragma' => 'no-cache',
+            'Cache-Control' => 'must-revalidate, post-check=0, pre-check=0',
+            'Expires' => '0'
+        ];
+
+        $callback = function() use ($solicitudes) {
+            $file = fopen('php://output', 'w');
+
+            // BOM para UTF-8
+            fprintf($file, chr(0xEF).chr(0xBB).chr(0xBF));
+
+            // Encabezados
+            fputcsv($file, [
+                'ID',
+                'Estado',
+                'Fecha Solicitud',
+                'Fecha Evento',
+                'Nombre Solicitante',
+                'Teléfono',
+                'Nombre Contacto',
+                'Departamento',
+                'Municipio',
+                'Comunidad',
+                'Comentario Solicitud',
+                'Comentario Gestión',
+                'Usuario Gestión',
+                'Fecha Inicio Gestión',
+                'Tipo Apoyo',
+                'Responsable Asignado',
+                'Monto',
+                'Usuario Aprobación',
+                'Fecha Aprobación',
+                'Motivo Rechazo',
+                'Usuario Rechazo',
+                'Fecha Rechazo',
+                'Tiene Doc Adjunto',
+                'Tiene Doc Firmado',
+                'Tiene Foto Entrega',
+                'Tiene Foto Conocimiento',
+                'Creado',
+                'Actualizado'
+            ]);
+
+            // Datos
+            foreach ($solicitudes as $s) {
+                fputcsv($file, [
+                    $s->id,
+                    $s->estado->value,
+                    $s->fecha_solicitud,
+                    $s->fecha_evento,
+                    $s->nombre_solicitante,
+                    $s->telefono,
+                    $s->nombre_contacto,
+                    $s->comunidad->municipio->departamento->nombre ?? '',
+                    $s->comunidad->municipio->nombre ?? '',
+                    $s->comunidad->nombre ?? '',
+                    $s->comentario_solicitud,
+                    $s->comentario_gestion,
+                    $s->nombre_usuario_gestion,
+                    $s->fecha_inicio_gestion,
+                    $s->tipoApoyo->nombre ?? '',
+                    $s->responsable_asignado,
+                    $s->monto,
+                    $s->nombre_usuario_aprobacion,
+                    $s->fecha_aprobacion,
+                    $s->motivo_rechazo,
+                    $s->nombre_usuario_rechazo,
+                    $s->fecha_rechazo,
+                    $s->path_documento_adjunto ? 'Sí' : 'No',
+                    $s->path_documento_firmado ? 'Sí' : 'No',
+                    $s->path_foto_entrega ? 'Sí' : 'No',
+                    $s->path_foto_conocimiento ? 'Sí' : 'No',
+                    $s->created_at,
+                    $s->updated_at
+                ]);
+            }
+
+            fclose($file);
+        };
+
+        return response()->stream($callback, 200, $headers);
     }
 }
