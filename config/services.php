@@ -35,4 +35,8 @@ return [
         ],
     ],
 
+    'app_madre' => [
+        'url' => env('APP_MADRE_URL'),
+    ],
+
 ];
