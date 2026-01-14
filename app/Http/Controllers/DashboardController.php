@@ -12,25 +12,30 @@ class DashboardController extends Controller
     public function index()
     {
         // 1. Estadísticas por Estado
-        // Agrupamos por estado y contamos, también queremos los IDs para el modal
-        $statsRaw = SolicitudApoyo::select('estado', DB::raw('count(*) as total'), DB::raw('GROUP_CONCAT(id) as ids'))
-            ->groupBy('estado')
+        // 1. Estadísticas por Estado
+        // Obtenemos todos los registros necesarios (id, estado, nombre_solicitante)
+        $allRequests = SolicitudApoyo::select('id', 'estado', 'nombre_solicitante')
+            ->orderBy('id', 'desc') // Ordenar por más reciente
             ->get();
 
         // Formateamos para el frontend
         $stats = [
-            'SOLICITADO' => ['count' => 0, 'ids' => []],
-            'EN_GESTION' => ['count' => 0, 'ids' => []],
-            'APROBADO' => ['count' => 0, 'ids' => []],
-            'FINALIZADO' => ['count' => 0, 'ids' => []],
-            'RECHAZADO' => ['count' => 0, 'ids' => []],
+            'SOLICITADO' => ['count' => 0, 'items' => []],
+            'EN_GESTION' => ['count' => 0, 'items' => []],
+            'APROBADO' => ['count' => 0, 'items' => []],
+            'FINALIZADO' => ['count' => 0, 'items' => []],
+            'RECHAZADO' => ['count' => 0, 'items' => []],
         ];
 
-        foreach ($statsRaw as $row) {
-            $key = $row->estado instanceof \BackedEnum ? $row->estado->value : $row->estado;
+        foreach ($allRequests as $req) {
+            $key = $req->estado instanceof \BackedEnum ? $req->estado->value : $req->estado;
+
             if (isset($stats[$key])) {
-                $stats[$key]['count'] = $row->total;
-                $stats[$key]['ids'] = $row->ids ? explode(',', $row->ids) : [];
+                $stats[$key]['count']++;
+                $stats[$key]['items'][] = [
+                    'id' => $req->id,
+                    'name' => $req->nombre_solicitante
+                ];
             }
         }
 
