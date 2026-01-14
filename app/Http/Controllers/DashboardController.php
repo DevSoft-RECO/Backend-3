@@ -61,9 +61,45 @@ class DashboardController extends Controller
                 ];
             });
 
+        // 3. Próximos Eventos (Mi Agencia)
+        // Obtenemos el usuario autenticado para saber su agencia
+        $user = request()->user();
+        $agenciaId = $user->idagencia ?? null;
+
+        $myUpcomingEvents = [];
+
+        if ($agenciaId) {
+            $myUpcomingEvents = SolicitudApoyo::whereDate('fecha_evento', '>=', Carbon::today())
+                ->whereIn('estado', ['SOLICITADO', 'EN_GESTION', 'APROBADO'])
+                ->where('agencia_id', $agenciaId) // Filtro exclusivo por agencia
+                ->orderBy('fecha_evento', 'asc')
+                ->take(10)
+                ->with(['comunidad.municipio'])
+                ->get()
+                ->map(function ($event) {
+                    // Reutilizamos la lógica de formateo de lugar
+                    $lugar = 'N/A';
+                    if ($event->comunidad) {
+                        $lugar = $event->comunidad->nombre;
+                        if ($event->comunidad->municipio) {
+                            $lugar .= ', ' . $event->comunidad->municipio->nombre;
+                        }
+                    }
+
+                    return [
+                        'id' => $event->id,
+                        'fecha_evento' => $event->fecha_evento,
+                        'nombre_solicitante' => $event->nombre_solicitante,
+                        'estado' => $event->estado,
+                        'lugar' => $lugar
+                    ];
+                });
+        }
+
         return response()->json([
             'stats' => $stats,
-            'upcoming_events' => $upcomingEvents
+            'upcoming_events' => $upcomingEvents,
+            'my_upcoming_events' => $myUpcomingEvents
         ]);
     }
 }
