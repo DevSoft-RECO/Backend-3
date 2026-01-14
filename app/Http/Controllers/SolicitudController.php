@@ -38,16 +38,16 @@ class SolicitudController extends Controller
 
         // Filtro por rango de fecha de evento (Urgency)
         if ($request->filled('fecha_inicio')) {
-            $query->whereDate('fecha_evento', '>=', $request->fecha_inicio);
+            $query->whereDate('fecha_evento_inicio', '>=', $request->fecha_inicio);
         }
         if ($request->filled('fecha_fin')) {
-            $query->whereDate('fecha_evento', '<=', $request->fecha_fin);
+            $query->whereDate('fecha_evento_inicio', '<=', $request->fecha_fin);
         }
 
-        // Ordenar: Si hay filtros de fecha, ordenar por urgencia (fecha_evento asc)
+        // Ordenar: Si hay filtros de fecha, ordenar por urgencia (fecha_evento_inicio asc)
         // Si no hay filtros de fecha, ordenar por más reciente (created_at desc)
         if ($request->filled('fecha_inicio') || $request->filled('fecha_fin')) {
-            $query->orderBy('fecha_evento', 'asc');
+            $query->orderBy('fecha_evento_inicio', 'asc');
         } else {
             $query->orderBy('created_at', 'desc');
         }
@@ -91,17 +91,7 @@ class SolicitudController extends Controller
 
         // Paginación: 10 por defecto para rapidez, o el valor solicitado
         $perPage = $request->input('per_page', 10);
-        return response()->json($query->paginate($perPage)->through(function ($item) {
-            $disk = Storage::disk($this->disk);
-            $ttl = now()->addMinutes(20);
-
-            $item->url_documento_adjunto = $item->path_documento_adjunto ? $disk->temporaryUrl($item->path_documento_adjunto, $ttl) : null;
-            $item->url_documento_firmado = $item->path_documento_firmado ? $disk->temporaryUrl($item->path_documento_firmado, $ttl) : null;
-            $item->url_foto_entrega = $item->path_foto_entrega ? $disk->temporaryUrl($item->path_foto_entrega, $ttl) : null;
-            $item->url_foto_conocimiento = $item->path_foto_conocimiento ? $disk->temporaryUrl($item->path_foto_conocimiento, $ttl) : null;
-
-            return $item;
-        }));
+        return response()->json($query->paginate($perPage));
     }
 
     // ----------------------------------------------------------------
@@ -111,7 +101,8 @@ class SolicitudController extends Controller
     {
         $data = $request->validate([
             'fecha_solicitud' => 'required|date',
-            'fecha_evento' => 'required|date',
+            'fecha_evento_inicio' => 'required|date',
+            'fecha_evento_fin' => 'required|date|after_or_equal:fecha_evento_inicio',
             'nombre_solicitante' => 'required|string',
             'telefono' => 'required|string',
             'nombre_contacto' => 'nullable|string',
@@ -124,6 +115,10 @@ class SolicitudController extends Controller
         $file = $request->file('documento_adjunto');
         $filename = uniqid() . '_' . $file->getClientOriginalName();
         $path = $file->storeAs('mercadeo/solicitudes/iniciales', $filename, $this->disk);
+
+        if (!$path) {
+            return response()->json(['error' => 'Error al subir documento adjunto al disco ' . $this->disk], 500);
+        }
 
         $user = $request->user();
 
@@ -182,6 +177,7 @@ class SolicitudController extends Controller
                 'responsable_asignado' => 'required|string',
                 'tipo_apoyo_id' => 'required|exists:tipos_apoyo,id',
                 'monto' => 'nullable|numeric',
+                'comentario_aprobacion' => 'nullable|string',
                 'documento_firmado' => 'required|file|mimes:pdf|max:5120',
             ]);
 
@@ -189,6 +185,10 @@ class SolicitudController extends Controller
             $file = $request->file('documento_firmado');
             $filename = uniqid() . '_' . $file->getClientOriginalName();
             $path = $file->storeAs('mercadeo/solicitudes/firmados', $filename, $this->disk);
+
+            if (!$path) {
+                return response()->json(['error' => 'Error al subir documento firmado'], 500);
+            }
 
             $user = $request->user();
             $userName = $request->input('nombre_usuario')
@@ -200,6 +200,7 @@ class SolicitudController extends Controller
                 'responsable_asignado' => $request->responsable_asignado,
                 'tipo_apoyo_id' => $request->tipo_apoyo_id,
                 'monto' => $request->monto,
+                'comentario_aprobacion' => $request->input('comentario_aprobacion'),
                 'path_documento_firmado' => $path,
                 'usuario_aprobacion_id' => $user->id,
                 'nombre_usuario_aprobacion' => $userName,
@@ -223,20 +224,19 @@ class SolicitudController extends Controller
         }
 
         $request->validate([
-            'foto_entrega' => 'required|file|mimes:pdf|max:5120',
-            'foto_conocimiento' => 'required|file|mimes:pdf|max:5120',
+            'documento_evidencia' => 'required|file|mimes:pdf|max:5120',
         ]);
 
         // CAMBIO: Archivos enviados directo a la nube carpeta 'mercadeo'
-        $fileEntrega = $request->file('foto_entrega');
-        $pathEntrega = $fileEntrega->storeAs('mercadeo/evidencias', uniqid() . '_' . $fileEntrega->getClientOriginalName(), $this->disk);
+        $file = $request->file('documento_evidencia');
+        $path = $file->storeAs('mercadeo/evidencias', uniqid() . '_' . $file->getClientOriginalName(), $this->disk);
 
-        $fileConocimiento = $request->file('foto_conocimiento');
-        $pathConocimiento = $fileConocimiento->storeAs('mercadeo/evidencias', uniqid() . '_' . $fileConocimiento->getClientOriginalName(), $this->disk);
+        if (!$path) {
+             return response()->json(['error' => 'Error al subir documento evidencia'], 500);
+        }
 
         $solicitud->update([
-            'path_foto_entrega' => $pathEntrega,
-            'path_foto_conocimiento' => $pathConocimiento,
+            'path_documento_evidencia' => $path,
             'estado' => EstadoSolicitud::Finalizado,
         ]);
 
@@ -309,13 +309,15 @@ class SolicitudController extends Controller
         // Validacion flexible para admins
         $data = $request->validate([
             'fecha_solicitud' => 'nullable|date',
-            'fecha_evento' => 'nullable|date',
+            'fecha_evento_inicio' => 'nullable|date',
+            'fecha_evento_fin' => 'nullable|date',
             'nombre_solicitante' => 'nullable|string',
             'nombre_contacto' => 'nullable|string',
             'telefono' => 'nullable|string',
             'monto' => 'nullable|numeric',
             'comentario_solicitud' => 'nullable|string',
             'comentario_gestion' => 'nullable|string',
+            'comentario_aprobacion' => 'nullable|string',
             'responsable_asignado' => 'nullable|string',
             'tipo_apoyo_id' => 'nullable|exists:tipos_apoyo,id',
             'documento_adjunto' => 'nullable|file|mimes:pdf|max:5120',
@@ -330,7 +332,13 @@ class SolicitudController extends Controller
             }
             $file = $request->file('documento_adjunto');
             $filename = uniqid() . '_' . $file->getClientOriginalName();
-            $dataToUpdate['path_documento_adjunto'] = $file->storeAs('mercadeo/solicitudes/iniciales', $filename, $this->disk);
+            $path = $file->storeAs('mercadeo/solicitudes/iniciales', $filename, $this->disk);
+
+            if (!$path) {
+                return response()->json(['error' => 'Error al subir documento adjunto (Update)'], 500);
+            }
+
+            $dataToUpdate['path_documento_adjunto'] = $path;
         }
 
         $solicitud->update($dataToUpdate);
@@ -350,11 +358,8 @@ class SolicitudController extends Controller
         if ($solicitud->path_documento_firmado) {
             Storage::disk($this->disk)->delete($solicitud->path_documento_firmado);
         }
-        if ($solicitud->path_foto_entrega) {
-            Storage::disk($this->disk)->delete($solicitud->path_foto_entrega);
-        }
-        if ($solicitud->path_foto_conocimiento) {
-            Storage::disk($this->disk)->delete($solicitud->path_foto_conocimiento);
+        if ($solicitud->path_documento_evidencia) {
+            Storage::disk($this->disk)->delete($solicitud->path_documento_evidencia);
         }
 
         $solicitud->delete();
@@ -367,14 +372,13 @@ class SolicitudController extends Controller
     // ----------------------------------------------------------------
     public function getFileUrl(Request $request, SolicitudApoyo $solicitud)
     {
-        $request->validate(['type' => 'required|string|in:adjunto,firmado,entrega,conocimiento']);
+        $request->validate(['type' => 'required|string|in:adjunto,firmado,evidencia']);
 
         $path = null;
         switch ($request->type) {
             case 'adjunto': $path = $solicitud->path_documento_adjunto; break;
             case 'firmado': $path = $solicitud->path_documento_firmado; break;
-            case 'entrega': $path = $solicitud->path_foto_entrega; break;
-            case 'conocimiento': $path = $solicitud->path_foto_conocimiento; break;
+            case 'evidencia': $path = $solicitud->path_documento_evidencia; break;
         }
 
         if (!$path) {
@@ -423,7 +427,8 @@ class SolicitudController extends Controller
                 'Estado',
                 'FechaCreado',
                 'Fecha Solicitud',
-                'Fecha Evento',
+                'Fecha Evento Inicio',
+                'Fecha Evento Fin',
                 'Nombre Solicitante',
                 'Teléfono',
                 'Nombre Contacto',
@@ -439,13 +444,13 @@ class SolicitudController extends Controller
                 'Monto',
                 'Usuario Aprobación',
                 'Fecha Aprobación',
+                'Comentario Aprobación',
                 'Motivo Rechazo',
                 'Usuario Rechazo',
                 'Fecha Rechazo',
                 'Tiene Doc Adjunto',
                 'Tiene Doc Firmado',
-                'Tiene Foto Entrega',
-                'Tiene Foto Conocimiento',
+                'Tiene Doc Evidencia',
                 'Actualizado'
             ]);
 
@@ -458,7 +463,8 @@ class SolicitudController extends Controller
                     $s->estado->value,      // Matches 'Estado' header
                     $s->created_at,
                     $s->fecha_solicitud,
-                    $s->fecha_evento,
+                    $s->fecha_evento_inicio,
+                    $s->fecha_evento_fin,
                     $s->nombre_solicitante,
                     $s->telefono,
                     $s->nombre_contacto,
@@ -474,13 +480,13 @@ class SolicitudController extends Controller
                     $s->monto,
                     $s->nombre_usuario_aprobacion,
                     $s->fecha_aprobacion,
+                    $s->comentario_aprobacion,
                     $s->motivo_rechazo,
                     $s->nombre_usuario_rechazo,
                     $s->fecha_rechazo,
                     $s->path_documento_adjunto ? 'Sí' : 'No',
                     $s->path_documento_firmado ? 'Sí' : 'No',
-                    $s->path_foto_entrega ? 'Sí' : 'No',
-                    $s->path_foto_conocimiento ? 'Sí' : 'No',
+                    $s->path_documento_evidencia ? 'Sí' : 'No',
                     $s->updated_at
                 ]);
             }

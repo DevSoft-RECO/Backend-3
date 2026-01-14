@@ -36,9 +36,9 @@ class DashboardController extends Controller
 
         // 2. Próximos Eventos
         // Eventos a partir de hoy, ordenados por fecha ascendente
-        $upcomingEvents = SolicitudApoyo::whereDate('fecha_evento', '>=', Carbon::today())
+        $upcomingEvents = SolicitudApoyo::whereDate('fecha_evento_inicio', '>=', Carbon::today())
             ->whereIn('estado', ['SOLICITADO', 'EN_GESTION', 'APROBADO']) // Solo activos
-            ->orderBy('fecha_evento', 'asc')
+            ->orderBy('fecha_evento_inicio', 'asc')
             ->take(10) // Limitamos a 10
             ->with(['comunidad.municipio']) // Eager Load
             ->get() // Obtenemos todas las columnas o especificar las existentes
@@ -54,7 +54,7 @@ class DashboardController extends Controller
 
                 return [
                     'id' => $event->id,
-                    'fecha_evento' => $event->fecha_evento, // Es objeto Carbon gracias al cast
+                    'fecha_evento' => $event->fecha_evento_inicio, // Es objeto Carbon gracias al cast
                     'nombre_solicitante' => $event->nombre_solicitante,
                     'estado' => $event->estado,
                     'lugar' => $lugar
@@ -69,10 +69,10 @@ class DashboardController extends Controller
         $myUpcomingEvents = [];
 
         if ($agenciaId) {
-            $myUpcomingEvents = SolicitudApoyo::whereDate('fecha_evento', '>=', Carbon::today())
+            $myUpcomingEvents = SolicitudApoyo::whereDate('fecha_evento_inicio', '>=', Carbon::today())
                 ->whereIn('estado', ['SOLICITADO', 'EN_GESTION', 'APROBADO'])
                 ->where('agencia_id', $agenciaId) // Filtro exclusivo por agencia
-                ->orderBy('fecha_evento', 'asc')
+                ->orderBy('fecha_evento_inicio', 'asc')
                 ->take(10)
                 ->with(['comunidad.municipio'])
                 ->get()
@@ -88,7 +88,7 @@ class DashboardController extends Controller
 
                     return [
                         'id' => $event->id,
-                        'fecha_evento' => $event->fecha_evento,
+                        'fecha_evento' => $event->fecha_evento_inicio,
                         'nombre_solicitante' => $event->nombre_solicitante,
                         'estado' => $event->estado,
                         'lugar' => $lugar
