@@ -103,11 +103,11 @@ class SolicitudController extends Controller
             'fecha_solicitud' => 'required|date',
             'fecha_evento_inicio' => 'required|date',
             'fecha_evento_fin' => 'required|date|after_or_equal:fecha_evento_inicio',
-            'nombre_solicitante' => 'required|string',
-            'telefono' => 'required|string',
-            'nombre_contacto' => 'nullable|string',
+            'nombre_solicitante' => 'required|string|max:255',
+            'telefono' => 'required|string|max:20',
+            'nombre_contacto' => 'nullable|string|max:255',
             'comunidad_id' => 'required|exists:comunidades,id',
-            'comentario_solicitud' => 'required|string',
+            'comentario_solicitud' => 'required|string|max:1000',
             'documento_adjunto' => 'required|file|mimes:pdf|max:5120',
         ]);
 
@@ -224,7 +224,7 @@ class SolicitudController extends Controller
         }
 
         $request->validate([
-            'documento_evidencia' => 'required|file|mimes:pdf|max:5120',
+            'documento_evidencia' => 'required|file|mimes:pdf,jpg,jpeg,png|max:5120',
         ]);
 
         // CAMBIO: Archivos enviados directo a la nube carpeta 'mercadeo'
@@ -311,14 +311,14 @@ class SolicitudController extends Controller
             'fecha_solicitud' => 'nullable|date',
             'fecha_evento_inicio' => 'nullable|date',
             'fecha_evento_fin' => 'nullable|date',
-            'nombre_solicitante' => 'nullable|string',
-            'nombre_contacto' => 'nullable|string',
-            'telefono' => 'nullable|string',
+            'nombre_solicitante' => 'nullable|string|max:255',
+            'nombre_contacto' => 'nullable|string|max:255',
+            'telefono' => 'nullable|string|max:20',
             'monto' => 'nullable|numeric',
-            'comentario_solicitud' => 'nullable|string',
-            'comentario_gestion' => 'nullable|string',
-            'comentario_aprobacion' => 'nullable|string',
-            'responsable_asignado' => 'nullable|string',
+            'comentario_solicitud' => 'nullable|string|max:1000',
+            'comentario_gestion' => 'nullable|string|max:1000',
+            'comentario_aprobacion' => 'nullable|string|max:1000',
+            'responsable_asignado' => 'nullable|string|max:255',
             'tipo_apoyo_id' => 'nullable|exists:tipos_apoyo,id',
             'documento_adjunto' => 'nullable|file|mimes:pdf|max:5120',
         ]);
