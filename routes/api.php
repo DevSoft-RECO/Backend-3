@@ -8,12 +8,16 @@ use App\Http\Controllers\TipoApoyoController;
 use App\Http\Controllers\FacturaController;
 use App\Http\Controllers\CategoriaFacturaController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\AuditController;
 
 // Asegúrate de que el middleware 'sso' esté registrado en bootstrap/app.php
 Route::middleware('sso')->group(function () {
 
-    // --- DASHBOARD ---
     Route::get('/dashboard', [DashboardController::class, 'index']);
+
+    // --- AUDIT ---
+    Route::get('/audit/solicitudes', [AuditController::class, 'index']);
+    Route::get('/audit/agencias-catalog', [AuditController::class, 'agenciasCatalog']);
 
     // --- LOCALIDADES ---
     Route::get('/departamentos', [LocalidadController::class, 'indexDepartamentos']);
