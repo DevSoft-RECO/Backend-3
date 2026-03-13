@@ -58,4 +58,19 @@ class AuditController extends Controller
 
         return response()->json($agencias);
     }
+
+    /**
+     * Get aggregate statistics for the audit dashboard.
+     */
+    public function auditStats()
+    {
+        $stats = [
+            'total' => SolicitudApoyo::count(),
+            'pendientes' => SolicitudApoyo::whereIn('estado', ['SOLICITADO', 'EN_GESTION'])->count(),
+            'aprobados' => SolicitudApoyo::where('estado', 'APROBADO')->count(),
+            'finalizados' => SolicitudApoyo::whereIn('estado', ['FINALIZADO', 'RECHAZADO'])->count(),
+        ];
+
+        return response()->json($stats);
+    }
 }

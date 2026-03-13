@@ -18,6 +18,7 @@ Route::middleware('sso')->group(function () {
     // --- AUDIT ---
     Route::get('/audit/solicitudes', [AuditController::class, 'index']);
     Route::get('/audit/agencias-catalog', [AuditController::class, 'agenciasCatalog']);
+    Route::get('/audit/stats', [AuditController::class, 'auditStats']);
 
     // --- LOCALIDADES ---
     Route::get('/departamentos', [LocalidadController::class, 'indexDepartamentos']);
