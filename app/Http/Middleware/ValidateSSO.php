@@ -49,13 +49,33 @@ class ValidateSSO
             $response = Http::withToken($token)->get("{$motherUrl}/api/me");
 
             if ($response->successful()) {
-                // ÉXITO: Tenemos conexión. Usamos los datos completos del usuario (Roles actualizados).
                 $userData = $response->json();
-                $userData['id'] = $decoded->sub; // Aseguramos que el ID venga del token
+                
+                // Desempaquetar si viene envuelto en 'data' (AppResource)
+                if (isset($userData['data'])) {
+                    $userData = $userData['data'];
+                }
+
+                // CRÍTICO: "Aplanar" Arrays de Objetos Spatie -> Strings puros
+                if (isset($userData['roles']) && is_array($userData['roles'])) {
+                    $userData['roles'] = array_map(function($r) { 
+                        return is_array($r) ? ($r['name'] ?? $r) : (is_object($r) ? ($r->name ?? $r) : $r); 
+                    }, $userData['roles']);
+                }
+                
+                if (isset($userData['permisos']) && is_array($userData['permisos'])) {
+                    $userData['permisos'] = array_map(function($p) { 
+                        return is_array($p) ? ($p['name'] ?? $p) : (is_object($p) ? ($p->name ?? $p) : $p); 
+                    }, $userData['permisos']);
+                }
+
+                // Estandarizar para el frontend
+                $userData['permissions'] = $userData['permisos'] ?? [];
+                $userData['id'] = $decoded->sub;
+                
                 $user = new GenericUser($userData);
             } else {
-                // FALLBACK: Si la Madre está caída o lenta, no bloqueamos al usuario.
-                // Usamos los datos básicos que vienen incrustados en el token JWT.
+                // FALLBACK: Datos del Token
                 $userData = (array) $decoded;
                 $userData['id'] = $decoded->sub;
                 $user = new GenericUser($userData);
