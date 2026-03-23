@@ -57,20 +57,26 @@ class ValidateSSO
                 }
 
                 // CRÍTICO: "Aplanar" Arrays de Objetos Spatie -> Strings puros
+                // Soportamos tanto 'permisos' como 'permissions'
+                $rawPermissions = $userData['permisos'] ?? $userData['permissions'] ?? [];
+                
                 if (isset($userData['roles']) && is_array($userData['roles'])) {
                     $userData['roles'] = array_map(function($r) { 
                         return is_array($r) ? ($r['name'] ?? $r) : (is_object($r) ? ($r->name ?? $r) : $r); 
                     }, $userData['roles']);
                 }
                 
-                if (isset($userData['permisos']) && is_array($userData['permisos'])) {
-                    $userData['permisos'] = array_map(function($p) { 
+                if (is_array($rawPermissions)) {
+                    $userData['permissions'] = array_map(function($p) { 
                         return is_array($p) ? ($p['name'] ?? $p) : (is_object($p) ? ($p->name ?? $p) : $p); 
-                    }, $userData['permisos']);
+                    }, $rawPermissions);
+                    // Mantenemos 'permisos' para compatibilidad con lógica que use ese nombre
+                    $userData['permisos'] = $userData['permissions']; 
+                } else {
+                    $userData['permissions'] = [];
+                    $userData['permisos'] = [];
                 }
 
-                // Estandarizar para el frontend
-                $userData['permissions'] = $userData['permisos'] ?? [];
                 $userData['id'] = $decoded->sub;
                 
                 $user = new GenericUser($userData);

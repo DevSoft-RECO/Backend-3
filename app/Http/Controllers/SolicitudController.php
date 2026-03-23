@@ -71,14 +71,14 @@ class SolicitudController extends Controller
         $roles = $user->roles ?? [];
         $permissions = $user->permissions ?? [];
 
-        $checkRole = function($haystack, $needle) {
+        $checkPermission = function($haystack, $needle) {
             return is_array($haystack) && !empty(array_filter($haystack, function($item) use ($needle) {
                 return strtolower($item) === strtolower($needle);
             }));
         };
 
-        $isSuperAdmin = $checkRole($roles, 'Super Admin');
-        $hasAdminPermission = $checkRole($permissions, 'admin_mercadeo');
+        $isSuperAdmin = $checkPermission($roles, 'Super Admin');
+        $hasAdminPermission = $checkPermission($permissions, 'admin_mercadeo');
 
         // Filtro obligarorios:
         // 1. Si el usuario NO tiene permisos de admin (Super Admin o admin_mercadeo), ve solo SU AGENCIA.

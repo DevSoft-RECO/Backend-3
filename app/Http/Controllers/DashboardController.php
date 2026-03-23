@@ -9,14 +9,32 @@ use Illuminate\Support\Facades\DB;
 
 class DashboardController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
+        $user = $request->user();
+        $roles = $user->roles ?? [];
+        $permissions = $user->permissions ?? [];
+
+        $checkPermission = function($haystack, $needle) {
+            return is_array($haystack) && !empty(array_filter($haystack, function($item) use ($needle) {
+                return strtolower($item) === strtolower($needle);
+            }));
+        };
+
+        $isSuperAdmin = $checkPermission($roles, 'Super Admin');
+        $hasAdminPermission = $checkPermission($permissions, 'admin_mercadeo');
+
         // 1. Estadísticas por Estado
         // 1. Estadísticas por Estado
-        // Obtenemos todos los registros necesarios (id, estado, nombre_solicitante)
-        $allRequests = SolicitudApoyo::select('id', 'estado', 'nombre_solicitante')
-            ->orderBy('id', 'desc') // Ordenar por más reciente
-            ->get();
+        // Obtenemos todos los registros necesarios
+        $query = SolicitudApoyo::select('id', 'estado', 'nombre_solicitante');
+
+        // Filtro por agencia si NO es Admin
+        if (!$isSuperAdmin && !$hasAdminPermission) {
+            $query->where('agencia_id', $user->idagencia);
+        }
+
+        $allRequests = $query->orderBy('id', 'desc')->get();
 
         // Formateamos para el frontend
         $stats = [
@@ -39,11 +57,17 @@ class DashboardController extends Controller
             }
         }
 
-        // 2. Próximos Eventos
+        // 2. Próximos Eventos (General o Mi Agencia completa para Admin)
         // Eventos a partir de hoy, ordenados por fecha ascendente
-        $upcomingEvents = SolicitudApoyo::whereDate('fecha_evento_inicio', '>=', Carbon::today())
-            ->whereIn('estado', ['SOLICITADO', 'EN_GESTION', 'APROBADO']) // Solo activos
-            ->orderBy('fecha_evento_inicio', 'asc')
+        $eventQuery = SolicitudApoyo::whereDate('fecha_evento_inicio', '>=', Carbon::today())
+            ->whereIn('estado', ['SOLICITADO', 'EN_GESTION', 'APROBADO']);
+
+        // Filtro por agencia si NO es Admin
+        if (!$isSuperAdmin && !$hasAdminPermission) {
+             $eventQuery->where('agencia_id', $user->idagencia);
+        }
+
+        $upcomingEvents = $eventQuery->orderBy('fecha_evento_inicio', 'asc')
             ->take(10) // Limitamos a 10
             ->with(['comunidad.municipio']) // Eager Load
             ->get() // Obtenemos todas las columnas o especificar las existentes
