@@ -6,7 +6,12 @@ Route::get('/', function () {
     return view('welcome');
 });
 
-
+// Ruta Anti-JSON / Rescate de Sesión Expirada
+Route::get('/login', function () {
+    // Si falla el JWT y Laravel intenta redirigir al "login", lo mandamos de vuelta al portal Madre
+    $frontendUrl = env('APP_URL_FRONTEND', 'http://localhost:5173');
+    return redirect($frontendUrl . '/login?session_expired=true');
+})->name('login');
 
 Route::get('/debug-gcs', function () {
     // Esto obliga al SDK de Google a mostrar el error real de la API

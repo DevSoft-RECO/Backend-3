@@ -57,25 +57,28 @@ class ValidateSSO
                 }
 
                 // CRÍTICO: "Aplanar" Arrays de Objetos Spatie -> Strings puros
-                // Soportamos tanto 'permisos' como 'permissions'
-                $rawPermissions = $userData['permisos'] ?? $userData['permissions'] ?? [];
+                // Soportamos tanto 'permisos', 'permissions' como 'roles'
                 
                 if (isset($userData['roles']) && is_array($userData['roles'])) {
                     $userData['roles'] = array_map(function($r) { 
                         return is_array($r) ? ($r['name'] ?? $r) : (is_object($r) ? ($r->name ?? $r) : $r); 
                     }, $userData['roles']);
+                } else {
+                    $userData['roles'] = [];
                 }
                 
+                $rawPermissions = $userData['permisos'] ?? $userData['permissions'] ?? [];
                 if (is_array($rawPermissions)) {
                     $userData['permissions'] = array_map(function($p) { 
                         return is_array($p) ? ($p['name'] ?? $p) : (is_object($p) ? ($p->name ?? $p) : $p); 
                     }, $rawPermissions);
-                    // Mantenemos 'permisos' para compatibilidad con lógica que use ese nombre
-                    $userData['permisos'] = $userData['permissions']; 
                 } else {
                     $userData['permissions'] = [];
-                    $userData['permisos'] = [];
                 }
+
+                // Estandarizar Nombres para Front/Back consistente
+                $userData['permisos'] = $userData['permissions'];
+                $userData['roles_list'] = $userData['roles'];
 
                 $userData['id'] = $decoded->sub;
                 
