@@ -8,15 +8,12 @@ use Symfony\Component\HttpFoundation\Response;
 use Firebase\JWT\JWT;
 use Firebase\JWT\Key;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Http;
-use Illuminate\Auth\GenericUser;
-use Exception;
+use App\Models\User;
 
 class ValidateSSO
 {
     public function handle(Request $request, Closure $next): Response
     {
-        // Obtener el token del encabezado Authorization: Bearer ...
         $token = $request->bearerToken();
 
         if (!$token) {
@@ -24,78 +21,38 @@ class ValidateSSO
         }
 
         try {
-            // 1. Validar existencia de la Llave Pública
+            // Cargar la llave pública almacenada localmente
             $publicKeyPath = storage_path('oauth-public.key');
 
             if (!file_exists($publicKeyPath)) {
-                throw new Exception("Error de servidor: Falta llave pública de validación.");
+                throw new \Exception("Falta la llave pública oauth-public.key en el servidor hijo");
             }
 
             $publicKey = file_get_contents($publicKeyPath);
-            JWT::$leeway = 60; // Margen de 60s por si los relojes de los servidores no están sincronizados
+            JWT::$leeway = 60; // Mitigar desincronizaciones de reloj entre servidores
 
-            // 2. Decodificar y Validar firma del Token (RS256)
+            // 1. Decodificar el Token en memoria de forma local (RS256)
             $decoded = JWT::decode($token, new Key($publicKey, 'RS256'));
 
-            // 3. Obtener URL de la App Madre
-            // NOTA: Usamos config() porque en producción env() devuelve null si la caché está activa.
-            $motherUrl = config('services.app_madre.url');
+            // 2. Carga rápida pasiva desde la base de datos local
+            $dbUser = User::where('id', $decoded->sub)->first();
 
-            if (empty($motherUrl)) {
-                throw new Exception("Configuración incompleta: URL Madre no definida.");
-            }
-
-            // 4. Intentar obtener datos frescos (Roles/Permisos) desde la Madre
-            $response = Http::withToken($token)->get("{$motherUrl}/api/me");
-
-            if ($response->successful()) {
-                $userData = $response->json();
-                
-                // Desempaquetar si viene envuelto en 'data' (AppResource)
-                if (isset($userData['data'])) {
-                    $userData = $userData['data'];
-                }
-
-                // CRÍTICO: "Aplanar" Arrays de Objetos Spatie -> Strings puros
-                // Soportamos tanto 'permisos', 'permissions' como 'roles'
-                
-                if (isset($userData['roles']) && is_array($userData['roles'])) {
-                    $userData['roles'] = array_map(function($r) { 
-                        return is_array($r) ? ($r['name'] ?? $r) : (is_object($r) ? ($r->name ?? $r) : $r); 
-                    }, $userData['roles']);
-                } else {
-                    $userData['roles'] = [];
-                }
-                
-                $rawPermissions = $userData['permisos'] ?? $userData['permissions'] ?? [];
-                if (is_array($rawPermissions)) {
-                    $userData['permissions'] = array_map(function($p) { 
-                        return is_array($p) ? ($p['name'] ?? $p) : (is_object($p) ? ($p->name ?? $p) : $p); 
-                    }, $rawPermissions);
-                } else {
-                    $userData['permissions'] = [];
-                }
-
-                // Estandarizar Nombres para Front/Back consistente
-                $userData['permisos'] = $userData['permissions'];
-                $userData['roles_list'] = $userData['roles'];
-
-                $userData['id'] = $decoded->sub;
-                
-                $user = new GenericUser($userData);
+            if ($dbUser) {
+                // Loguear usuario real de la base de datos
+                Auth::setUser($dbUser);
             } else {
-                // FALLBACK: Datos del Token
-                $userData = (array) $decoded;
-                $userData['id'] = $decoded->sub;
-                $user = new GenericUser($userData);
+                // 3. Fallback de Red de Seguridad (Usuario no sincronizado en DB local aún)
+                // Creamos un modelo virtual no persistido con sus roles/permisos del JWT
+                $user = new User([
+                    'id' => $decoded->sub,
+                    'roles_list' => $decoded->roles ?? [],
+                    'permissions_list' => $decoded->permissions ?? [],
+                ]);
+                Auth::setUser($user);
             }
 
-            // Establecer el usuario en la sesión actual de la solicitud
-            Auth::setUser($user);
-
-        } catch (Exception $e) {
-            // Si el token es inválido, expirado o manipulado, devolvemos 401
-            return response()->json(['message' => 'Acceso Denegado: ' . $e->getMessage()], 401);
+        } catch (\Exception $e) {
+            return response()->json(['message' => 'Acceso Denegado (SSO): ' . $e->getMessage()], 401);
         }
 
         return $next($request);

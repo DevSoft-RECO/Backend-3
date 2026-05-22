@@ -9,10 +9,11 @@ use App\Http\Controllers\FacturaController;
 use App\Http\Controllers\CategoriaFacturaController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\AuditController;
+use App\Http\Controllers\Auth\SSOController;
 
-// Asegúrate de que el middleware 'sso' esté registrado en bootstrap/app.php
 Route::middleware('sso')->group(function () {
 
+    Route::get('/me', [SSOController::class, 'me']);
     Route::get('/dashboard', [DashboardController::class, 'index']);
 
     // --- AUDIT ---
