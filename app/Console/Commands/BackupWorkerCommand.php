@@ -38,7 +38,7 @@ class BackupWorkerCommand extends Command
         $filePath = $backupDir . DIRECTORY_SEPARATOR . $filename;
 
         // Obtener la ruta del ejecutable mysqldump desde config
-        $mysqldumpPath = config('backups.mysqldump_path') ?? 'mysqldump';
+        $mysqldumpPath = config('backups.mysqldump_path') ?? config('backups.pg_dump_path') ?? 'mysqldump';
 
         // Construir comando de volcado
         $isWindows = strtoupper(substr(PHP_OS, 0, 3)) === 'WIN';
