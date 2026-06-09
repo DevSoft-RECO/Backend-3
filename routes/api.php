@@ -72,3 +72,10 @@ Route::middleware('sso')->group(function () {
     Route::get('/facturas/export/csv', [FacturaController::class, 'exportCsv']);
     Route::apiResource('facturas', FacturaController::class);
 });
+
+// === BACKUP SYSTEM ===
+// Rutas internas de respaldo llamadas por la APP_MADRE (Firmadas con HMAC)
+Route::post('/internal/backup', [\App\Http\Controllers\InternalBackupController::class, 'generate']);
+Route::delete('/internal/backup', [\App\Http\Controllers\InternalBackupController::class, 'deleteFile']);
+Route::get('/internal/download-backup', [\App\Http\Controllers\InternalBackupController::class, 'download']);
+
