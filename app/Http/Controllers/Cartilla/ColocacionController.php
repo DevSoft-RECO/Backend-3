@@ -90,32 +90,58 @@ class ColocacionController extends Controller
                 $row = str_getcsv($line, $delimiter);
 
                 $areaFinanciera = trim($row[$indexes['AREA_FINANCIERA']] ?? '');
-                $agenciaId = $agenciasMap[$areaFinanciera] ?? null;
+                $agenciaId = $agenciasMap[$areaFinanciera] ?? $agenciasMap[intval($areaFinanciera)] ?? null;
                 if (!$agenciaId) continue;
 
                 $codigoCliente = preg_replace('/\D/', '', $row[$indexes['CLIENTE']] ?? '');
-                if (!preg_match('/^\d{5,7}$/', $codigoCliente)) continue;
+                if (empty($codigoCliente)) continue;
 
                 $numeroCuenta = preg_replace('/\D/', '', $row[$indexes['NUMERODOCUMENTO']] ?? '');
-                if (!preg_match("/^{$prefijo}[0-9]{" . ($digitos - strlen($prefijo)) . "}$/", $numeroCuenta)) continue;
+                if (empty($numeroCuenta)) continue;
 
-                $fechaPagoStr = preg_replace('/\D/', '', $row[$indexes['FECHAULTIMOPAGO']] ?? '');
-                $fechaSugeridaStr = preg_replace('/\D/', '', $row[$indexes['FECHAULTIMOPAGOCAPITAL']] ?? '');
+                // Si hay prefijo configurado, validar que inicie con él si tiene la longitud esperada
+                if (!empty($prefijo) && strpos($numeroCuenta, $prefijo) !== 0 && strlen($numeroCuenta) === intval($digitos)) {
+                    continue;
+                }
 
-                if (strlen($fechaPagoStr) !== 8 || strlen($fechaSugeridaStr) !== 8) continue;
-                if ($fechaPagoStr !== $fechaSugeridaStr) continue; // Solo pagos puntuales
+                $rawFechaPago = trim($row[$indexes['FECHAULTIMOPAGO']] ?? '');
+                $rawFechaSugerida = trim($row[$indexes['FECHAULTIMOPAGOCAPITAL']] ?? '');
+
+                if (empty($rawFechaPago) || empty($rawFechaSugerida)) continue;
+
+                // Parsear fecha flexiblemente (ej: 20260210, 20260831, 2026-02-10)
+                $parseFecha = function ($str) {
+                    $digitsOnly = preg_replace('/\D/', '', $str);
+                    if (strlen($digitsOnly) === 8) {
+                        try {
+                            return Carbon::createFromFormat('Ymd', $digitsOnly)->format('Y-m-d');
+                        } catch (\Exception $e) {}
+                    }
+                    try {
+                        return Carbon::parse(trim($str))->format('Y-m-d');
+                    } catch (\Exception $e) {
+                        return null;
+                    }
+                };
+
+                $fechaPagoStrFormatted = $parseFecha($rawFechaPago);
+                $fechaSugerida = $parseFecha($rawFechaSugerida);
+
+                if (!$fechaPagoStrFormatted || !$fechaSugerida) continue;
+                if ($fechaPagoStrFormatted !== $fechaSugerida) continue; // Solo pagos puntuales
 
                 $monto = floatval(preg_replace('/[^0-9.]/', '', $row[$indexes['CUOTACAPITAL']] ?? '0'));
                 if ($monto <= 0) continue;
 
-                $fechaPagoStrFormatted = Carbon::createFromFormat('Ymd', $fechaPagoStr)->format('Y-m-d');
-                $fechaPagoStartDay = $fechaPagoStrFormatted . ' 00:00:00';
-                $fechaPagoEndDay = $fechaPagoStrFormatted . ' 23:59:59';
-                $fechaSugerida = Carbon::createFromFormat('Ymd', $fechaSugeridaStr)->format('Y-m-d');
-
-                // Validar rango de fechas de la promoción: descarta inmediatamente pagos fuera de la promoción
-                if ($fechaInicioPromo && $fechaPagoEndDay < $fechaInicioPromo) continue;
-                if ($fechaFinPromo && $fechaPagoStartDay > $fechaFinPromo) continue;
+                // Validar rango de fechas de la promoción comparando únicamente fechas (YYYY-MM-DD)
+                if (!empty($fechaInicioPromo)) {
+                    $fechaInicioDate = substr($fechaInicioPromo, 0, 10);
+                    if ($fechaPagoStrFormatted < $fechaInicioDate) continue;
+                }
+                if (!empty($fechaFinPromo)) {
+                    $fechaFinDate = substr($fechaFinPromo, 0, 10);
+                    if ($fechaPagoStrFormatted > $fechaFinDate) continue;
+                }
 
                 $fechaPago = $fechaPagoStrFormatted;
 
