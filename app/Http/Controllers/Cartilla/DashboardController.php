@@ -35,6 +35,8 @@ class DashboardController extends Controller
             return response()->json(['error' => 'No existe agencia configurada en el sistema.'], 404);
         }
 
+        $agenciaId = $agencia->id;
+
         // Rango de fechas de la promoción
         $mecanica = \App\Models\Cartilla\Configuracion::where('clave', 'mecanica')->first()?->valor ?? [];
         $fechaInicioPromo = !empty($mecanica['fecha_inicio']) ? $mecanica['fecha_inicio'] : null;
