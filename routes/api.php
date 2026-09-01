@@ -71,6 +71,49 @@ Route::middleware('sso')->group(function () {
 
     Route::get('/facturas/export/csv', [FacturaController::class, 'exportCsv']);
     Route::apiResource('facturas', FacturaController::class);
+
+    // --- MÓDULO LA CARTILLA GANADORA ---
+    Route::prefix('cartilla')->group(function () {
+        Route::get('/dashboard/agencia', [\App\Http\Controllers\Cartilla\DashboardController::class, 'agencia']);
+        Route::get('/dashboard/global', [\App\Http\Controllers\Cartilla\DashboardController::class, 'global']);
+
+        Route::get('/registros', [\App\Http\Controllers\Cartilla\RegistroController::class, 'index']);
+        Route::post('/registros', [\App\Http\Controllers\Cartilla\RegistroController::class, 'store']);
+        Route::put('/registros/{registro}', [\App\Http\Controllers\Cartilla\RegistroController::class, 'update']);
+        Route::delete('/registros/{registro}', [\App\Http\Controllers\Cartilla\RegistroController::class, 'destroy']);
+
+        Route::get('/inventario/movimientos', [\App\Http\Controllers\Cartilla\InventarioController::class, 'index']);
+        Route::post('/inventario/movimientos', [\App\Http\Controllers\Cartilla\InventarioController::class, 'store']);
+        Route::put('/inventario/movimientos/{movimiento}', [\App\Http\Controllers\Cartilla\InventarioController::class, 'update']);
+        Route::delete('/inventario/movimientos/{movimiento}', [\App\Http\Controllers\Cartilla\InventarioController::class, 'destroy']);
+        Route::get('/inventario/stocks', [\App\Http\Controllers\Cartilla\InventarioController::class, 'stocksResumen']);
+        Route::get('/inventario/balance', [\App\Http\Controllers\Cartilla\InventarioController::class, 'balanceInventario']);
+
+        Route::get('/historial/registros', [\App\Http\Controllers\Cartilla\HistorialRegistroController::class, 'index']);
+        Route::get('/historial/inventario', [\App\Http\Controllers\Cartilla\HistorialInventarioController::class, 'index']);
+        Route::post('/historial/inventario/{historial}/restaurar', [\App\Http\Controllers\Cartilla\HistorialInventarioController::class, 'restaurar']);
+
+        Route::get('/configuracion', [\App\Http\Controllers\Cartilla\ConfiguracionController::class, 'index']);
+        Route::put('/configuracion', [\App\Http\Controllers\Cartilla\ConfiguracionController::class, 'update']);
+        Route::get('/configuracion/historial', [\App\Http\Controllers\Cartilla\ConfiguracionController::class, 'historial']);
+
+        Route::apiResource('promocionales', \App\Http\Controllers\Cartilla\PromocionalController::class);
+        Route::apiResource('notas-rapidas', \App\Http\Controllers\Cartilla\NotaRapidaController::class);
+        Route::put('/notas-rapidas/reordenar', [\App\Http\Controllers\Cartilla\NotaRapidaController::class, 'reordenar']);
+        Route::apiResource('recordatorios', \App\Http\Controllers\Cartilla\RecordatorioController::class);
+        Route::put('/recordatorios/reordenar', [\App\Http\Controllers\Cartilla\RecordatorioController::class, 'reordenar']);
+        Route::get('/agencias', [\App\Http\Controllers\Cartilla\AgenciaController::class, 'index']);
+
+        Route::get('/exportar/registros', [\App\Http\Controllers\Cartilla\ExportacionController::class, 'exportarRegistros']);
+        Route::get('/exportar/historial-registros', [\App\Http\Controllers\Cartilla\ExportacionController::class, 'exportarHistorialRegistros']);
+        Route::get('/exportar/movimientos', [\App\Http\Controllers\Cartilla\ExportacionController::class, 'exportarMovimientos']);
+        Route::get('/exportar/historial-inventario', [\App\Http\Controllers\Cartilla\ExportacionController::class, 'exportarHistorialInventario']);
+
+        // Colocaciones / Pagos automáticos
+        Route::post('/colocaciones/importar', [\App\Http\Controllers\Cartilla\ColocacionController::class, 'importar']);
+        Route::get('/colocaciones/pendientes', [\App\Http\Controllers\Cartilla\ColocacionController::class, 'pendientes']);
+        Route::post('/colocaciones/{pago}/reclamar', [\App\Http\Controllers\Cartilla\ColocacionController::class, 'reclamar']);
+    });
 });
 
 // === BACKUP SYSTEM ===

@@ -14,10 +14,14 @@ class ValidateSSO
 {
     public function handle(Request $request, Closure $next): Response
     {
-        $token = $request->bearerToken();
+        $token = $request->bearerToken() ?? $request->query('token') ?? $request->input('token');
 
         if (!$token) {
             return response()->json(['message' => 'Token requerido'], 401);
+        }
+
+        if (str_starts_with($token, 'Bearer ')) {
+            $token = substr($token, 7);
         }
 
         try {
