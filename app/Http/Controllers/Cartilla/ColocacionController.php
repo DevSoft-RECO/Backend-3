@@ -73,6 +73,17 @@ class ColocacionController extends Controller
 
             $totalFilas = 0;
             $filasElegibles = 0;
+            $descartes = [
+                'area_financiera_no_mapeada' => 0,
+                'cliente_invalido'           => 0,
+                'cuenta_invalida'            => 0,
+                'prefijo_no_coincide'        => 0,
+                'fecha_invalida'             => 0,
+                'no_puntual_pago_con_mora'   => 0,
+                'monto_invalido'             => 0,
+                'fuera_rango_promocion'      => 0,
+                'ya_registrado'              => 0,
+            ];
 
             $importacion = ColocacionImportacion::create([
                 'usuario_id'     => $user->id,
@@ -91,23 +102,36 @@ class ColocacionController extends Controller
 
                 $areaFinanciera = trim($row[$indexes['AREA_FINANCIERA']] ?? '');
                 $agenciaId = $agenciasMap[$areaFinanciera] ?? $agenciasMap[intval($areaFinanciera)] ?? null;
-                if (!$agenciaId) continue;
+                if (!$agenciaId) {
+                    $descartes['area_financiera_no_mapeada']++;
+                    continue;
+                }
 
                 $codigoCliente = preg_replace('/\D/', '', $row[$indexes['CLIENTE']] ?? '');
-                if (empty($codigoCliente)) continue;
+                if (empty($codigoCliente)) {
+                    $descartes['cliente_invalido']++;
+                    continue;
+                }
 
                 $numeroCuenta = preg_replace('/\D/', '', $row[$indexes['NUMERODOCUMENTO']] ?? '');
-                if (empty($numeroCuenta)) continue;
+                if (empty($numeroCuenta)) {
+                    $descartes['cuenta_invalida']++;
+                    continue;
+                }
 
                 // Si hay prefijo configurado, validar que inicie con él si tiene la longitud esperada
                 if (!empty($prefijo) && strpos($numeroCuenta, $prefijo) !== 0 && strlen($numeroCuenta) === intval($digitos)) {
+                    $descartes['prefijo_no_coincide']++;
                     continue;
                 }
 
                 $rawFechaPago = trim($row[$indexes['FECHAULTIMOPAGO']] ?? '');
                 $rawFechaSugerida = trim($row[$indexes['FECHAULTIMOPAGOCAPITAL']] ?? '');
 
-                if (empty($rawFechaPago) || empty($rawFechaSugerida)) continue;
+                if (empty($rawFechaPago) || empty($rawFechaSugerida)) {
+                    $descartes['fecha_invalida']++;
+                    continue;
+                }
 
                 // Parsear fecha flexiblemente (ej: 20260210, 20260831, 2026-02-10)
                 $parseFecha = function ($str) {
@@ -127,20 +151,35 @@ class ColocacionController extends Controller
                 $fechaPagoStrFormatted = $parseFecha($rawFechaPago);
                 $fechaSugerida = $parseFecha($rawFechaSugerida);
 
-                if (!$fechaPagoStrFormatted || !$fechaSugerida) continue;
-                if ($fechaPagoStrFormatted !== $fechaSugerida) continue; // Solo pagos puntuales
+                if (!$fechaPagoStrFormatted || !$fechaSugerida) {
+                    $descartes['fecha_invalida']++;
+                    continue;
+                }
+                if ($fechaPagoStrFormatted !== $fechaSugerida) {
+                    $descartes['no_puntual_pago_con_mora']++;
+                    continue; // Solo pagos puntuales
+                }
 
                 $monto = floatval(preg_replace('/[^0-9.]/', '', $row[$indexes['CUOTACAPITAL']] ?? '0'));
-                if ($monto <= 0) continue;
+                if ($monto <= 0) {
+                    $descartes['monto_invalido']++;
+                    continue;
+                }
 
                 // Validar rango de fechas de la promoción comparando únicamente fechas (YYYY-MM-DD)
                 if (!empty($fechaInicioPromo)) {
                     $fechaInicioDate = substr($fechaInicioPromo, 0, 10);
-                    if ($fechaPagoStrFormatted < $fechaInicioDate) continue;
+                    if ($fechaPagoStrFormatted < $fechaInicioDate) {
+                        $descartes['fuera_rango_promocion']++;
+                        continue;
+                    }
                 }
                 if (!empty($fechaFinPromo)) {
                     $fechaFinDate = substr($fechaFinPromo, 0, 10);
-                    if ($fechaPagoStrFormatted > $fechaFinDate) continue;
+                    if ($fechaPagoStrFormatted > $fechaFinDate) {
+                        $descartes['fuera_rango_promocion']++;
+                        continue;
+                    }
                 }
 
                 $fechaPago = $fechaPagoStrFormatted;
@@ -153,14 +192,20 @@ class ColocacionController extends Controller
                     })
                     ->exists();
 
-                if ($yaRegistradoEnCartilla) continue;
+                if ($yaRegistradoEnCartilla) {
+                    $descartes['ya_registrado']++;
+                    continue;
+                }
 
                 // Deduplicar contra colocaciones_pagos previas
                 $yaEnPagos = ColocacionPago::where('numero_cuenta', $numeroCuenta)
                     ->where('fecha_pago', $fechaPago)
                     ->exists();
 
-                if ($yaEnPagos) continue;
+                if ($yaEnPagos) {
+                    $descartes['ya_registrado']++;
+                    continue;
+                }
 
                 ColocacionPago::create([
                     'importacion_id'      => $importacion->id,
@@ -186,6 +231,7 @@ class ColocacionController extends Controller
                 'data'            => $importacion,
                 'total_filas'     => $totalFilas,
                 'filas_elegibles' => $filasElegibles,
+                'descartes'       => $descartes,
             ], 201);
         });
     }
