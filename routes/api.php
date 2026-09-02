@@ -77,6 +77,7 @@ Route::middleware('sso')->group(function () {
         Route::get('/dashboard/agencia', [\App\Http\Controllers\Cartilla\DashboardController::class, 'agencia']);
         Route::get('/dashboard/global', [\App\Http\Controllers\Cartilla\DashboardController::class, 'global']);
 
+        Route::get('/registros/calcular-stickers', [\App\Http\Controllers\Cartilla\RegistroController::class, 'calcularStickersPreview']);
         Route::get('/registros', [\App\Http\Controllers\Cartilla\RegistroController::class, 'index']);
         Route::post('/registros', [\App\Http\Controllers\Cartilla\RegistroController::class, 'store']);
         Route::put('/registros/{registro}', [\App\Http\Controllers\Cartilla\RegistroController::class, 'update']);

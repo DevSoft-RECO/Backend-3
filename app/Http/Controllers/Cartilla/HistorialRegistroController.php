@@ -14,7 +14,7 @@ class HistorialRegistroController extends Controller
         $query = HistorialRegistro::with(['registro.agencia']);
 
         $isSuperAdmin = $user->hasRole('Super Admin');
-        $hasAdminPermission = $user->hasPermissionTo('cartilla_mercadeo');
+        $hasAdminPermission = $user->hasPermissionTo('admin_promocion');
 
         if (!$isSuperAdmin && !$hasAdminPermission) {
             $agenciaCodigo = $user->agencia_id ?? $user->idagencia;

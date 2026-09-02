@@ -14,6 +14,72 @@ use Carbon\Carbon;
 
 class RegistroController extends Controller
 {
+    public function calcularStickersPreview(Request $request)
+    {
+        $codigoCliente = trim($request->input('codigo_cliente', ''));
+        $accion = $request->input('accion', '');
+        $tipoOperacion = $request->input('tipo_operacion', '');
+
+        $mecanica = Configuracion::where('clave', 'mecanica')->first()?->valor ?? [];
+        $stickers = 0;
+        $mensaje = '';
+        $yaRegistroPlazoFijo = false;
+        $detalleExistente = null;
+
+        if (!empty($accion)) {
+            switch ($accion) {
+                case 'CREDITO_NUEVO':
+                    $stickers = $mecanica['stickers_credito_nuevo'] ?? 15;
+                    $mensaje = "Asignación estándar por Crédito Nuevo: {$stickers} stickers.";
+                    break;
+                case 'PLAZO_FIJO':
+                    $stickersBase = $mecanica['stickers_plazo_fijo'] ?? 15;
+                    if (!empty($codigoCliente) && !empty($mecanica['plazo_fijo_unico_diario'])) {
+                        $registroExistente = Registro::with('agencia')
+                            ->where('codigo_cliente', $codigoCliente)
+                            ->where('accion', 'PLAZO_FIJO')
+                            ->where('stickers', '>', 0)
+                            ->whereDate('created_at', Carbon::today('America/Guatemala'))
+                            ->first();
+
+                        if ($registroExistente) {
+                            $yaRegistroPlazoFijo = true;
+                            $stickers = 0;
+                            $agenciaNombre = $registroExistente->agencia->nombre ?? 'otra agencia';
+                            $fechaFormateada = $registroExistente->created_at->format('H:i');
+                            $detalleExistente = "El asociado ya registró un Plazo Fijo el día de hoy en {$agenciaNombre} (a las {$fechaFormateada} hrs).";
+                            $mensaje = "⚠️ 0 stickers asignados. {$detalleExistente}";
+                        } else {
+                            $stickers = $stickersBase;
+                            $mensaje = "Asignación por Plazo Fijo: {$stickers} stickers.";
+                        }
+                    } else {
+                        $stickers = $stickersBase;
+                        $mensaje = "Asignación por Plazo Fijo: {$stickers} stickers.";
+                    }
+                    break;
+                case 'MOTOCICLETA':
+                    $isFinanciada = strtolower($tipoOperacion) === 'financiada';
+                    $stickers = $isFinanciada 
+                        ? ($mecanica['stickers_moto_financiada'] ?? 15)
+                        : ($mecanica['stickers_moto_contado'] ?? 10);
+                    $mensaje = "Asignación por Motocicleta ({$tipoOperacion}): {$stickers} stickers.";
+                    break;
+                case 'PAGO_PUNTUAL':
+                    $stickers = $mecanica['stickers_pago_puntual'] ?? 5;
+                    $mensaje = "Asignación por Pago Puntual: {$stickers} stickers.";
+                    break;
+            }
+        }
+
+        return response()->json([
+            'stickers'               => $stickers,
+            'mensaje'                => $mensaje,
+            'ya_registro_plazo_fijo' => $yaRegistroPlazoFijo,
+            'detalle_existente'      => $detalleExistente
+        ]);
+    }
+
     public function index(Request $request)
     {
         $user = $request->user();

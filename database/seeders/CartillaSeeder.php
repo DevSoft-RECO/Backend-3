@@ -70,14 +70,16 @@ class CartillaSeeder extends Seeder
 
         // 3. Notas Rápidas
         $notas = [
-            'Asociado solicita participar en sorteo',
-            'Se hace entrega de promocional respectivo',
-            'Cuenta ingresada corresponde a cuenta de ahorros',
-            'Crédito aprobado y desembolsado en fecha de hoy',
-            'Apertura realizada de manera presencial en agencia',
-            'Se rellenó cartilla y se firmó cupón de sorteo',
-            'Reposición de cartilla por daño físico',
+            'Reposición de cartilla por perdida',
+            'Reposición de cartilla por deterioro',
+            'Reposición de cartilla por daños físicos',
+            'Cartilla completada y entrega de promocional',
+            'Cartilla completada y entrega de promocional y nueva cartilla',
+            'Cartilla completada y nueva por exceso de stickers',
         ];
+
+        // Desactivar o limpiar notas anteriores no oficiales
+        DB::table('cartilla_notas_rapidas')->whereNotIn('texto', $notas)->update(['activo' => false]);
 
         foreach ($notas as $index => $nota) {
             DB::table('cartilla_notas_rapidas')->updateOrInsert(
@@ -91,7 +93,8 @@ class CartillaSeeder extends Seeder
             );
         }
 
-        // 4. Recordatorios
+        /*
+        // 4. Recordatorios (Comentado para no sobreescribir en producción)
         $recordatorios = [
             'Recuerda verificar la existencia física de promocionales antes de asignarlos.',
             'La primera cartilla de cada asociado debe ser entregada con su primera acción.',
@@ -119,7 +122,7 @@ class CartillaSeeder extends Seeder
             );
         }
 
-        // 5. Configuración Base
+        // 5. Configuración Base (Comentado para no sobreescribir en producción)
         $configuraciones = [
             'mecanica' => [
                 'stickers_credito_nuevo' => 15,
@@ -158,7 +161,7 @@ class CartillaSeeder extends Seeder
             );
         }
 
-        // 6. Inicialización de stocks en cero
+        // 6. Inicialización de stocks en cero (Comentado para no reiniciar los inventarios en producción)
         $dbAgencias = DB::table('cartilla_agencias')->get();
 
         // Stock Central (agencia_id = null)
@@ -194,5 +197,6 @@ class CartillaSeeder extends Seeder
                 );
             }
         }
+        */
     }
 }
