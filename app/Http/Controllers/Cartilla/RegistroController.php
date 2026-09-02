@@ -21,15 +21,19 @@ class RegistroController extends Controller
 
         // Scope por agencia si no es admin global
         $isSuperAdmin = $user->hasRole('Super Admin');
-        $hasAdminPermission = $user->hasPermissionTo('cartilla_mercadeo');
+        $hasAdminPermission = $user->hasPermissionTo('cartilla_mercadeo') || $user->hasPermissionTo('admin_promocion');
 
         if (!$isSuperAdmin && !$hasAdminPermission) {
-            // Se asume que el usuario SSO tiene un id de agencia local coincidente o mapeado.
-            // Para Mercadeo (admin) mostramos todas las agencias.
-            // Para el alcance de la solicitud (agope/cajero), mostramos solo su agencia.
-            $query->whereHas('agencia', function($q) use ($user) {
-                $q->where('codigo', $user->agencia_id ?? $user->idagencia);
-            });
+            // Usuarios de agencias (edicion_promocion_agencia, lectura_promocion_agencia, etc.)
+            $userAgencia = Agencia::where('codigo', $user->agencia_id ?? $user->idagencia)->first()
+                ?? Agencia::find($user->agencia_id ?? $user->idagencia);
+            if ($userAgencia) {
+                $query->where('agencia_id', $userAgencia->id);
+            } else {
+                $query->whereHas('agencia', function($q) use ($user) {
+                    $q->where('codigo', $user->agencia_id ?? $user->idagencia);
+                });
+            }
         }
 
         if ($request->filled('agencia_id')) {

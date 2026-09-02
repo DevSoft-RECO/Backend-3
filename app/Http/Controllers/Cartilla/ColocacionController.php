@@ -258,13 +258,18 @@ class ColocacionController extends Controller
 
         // Aislamiento por agencia si no es admin de Mercadeo
         $isSuperAdmin = $user->hasRole('Super Admin');
-        $hasAdminPermission = $user->hasPermissionTo('cartilla_mercadeo');
+        $hasAdminPermission = $user->hasPermissionTo('cartilla_mercadeo') || $user->hasPermissionTo('admin_promocion');
 
         if (!$isSuperAdmin && !$hasAdminPermission) {
             $agenciaCodigo = $user->agencia_id ?? $user->idagencia;
-            $query->whereHas('agencia', function ($q) use ($agenciaCodigo) {
-                $q->where('codigo', $agenciaCodigo);
-            });
+            $userAgencia = Agencia::where('codigo', $agenciaCodigo)->first() ?? Agencia::find($agenciaCodigo);
+            if ($userAgencia) {
+                $query->where('agencia_id', $userAgencia->id);
+            } else {
+                $query->whereHas('agencia', function ($q) use ($agenciaCodigo) {
+                    $q->where('codigo', $agenciaCodigo);
+                });
+            }
         }
 
         if ($request->filled('agencia_id')) {
