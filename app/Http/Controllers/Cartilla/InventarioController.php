@@ -20,7 +20,7 @@ class InventarioController extends Controller
 
         // Aislamiento por agencia para no admins
         $isSuperAdmin = $user->hasRole('Super Admin');
-        $hasAdminPermission = $user->hasPermissionTo('cartilla_mercadeo');
+        $hasAdminPermission = $user->hasPermissionTo('admin_promocion');
 
         if (!$isSuperAdmin && !$hasAdminPermission) {
             $query->whereHas('agencia', function($q) use ($user) {
@@ -295,7 +295,7 @@ class InventarioController extends Controller
     {
         $user = $request->user();
         $isSuperAdmin = $user->hasRole('Super Admin');
-        $hasAdminPermission = $user->hasPermissionTo('cartilla_mercadeo');
+        $hasAdminPermission = $user->hasPermissionTo('admin_promocion');
 
         // Determinar agencia si no es global
         $agenciaId = null;

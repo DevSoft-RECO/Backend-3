@@ -18,7 +18,7 @@ class DashboardController extends Controller
         $agenciaCodigo = $user->agencia_id ?? $user->idagencia;
 
         $isSuperAdmin = $user->hasRole('Super Admin');
-        $hasAdminPermission = $user->hasPermissionTo('cartilla_mercadeo');
+        $hasAdminPermission = $user->hasPermissionTo('admin_promocion');
 
         if ($request->filled('agencia_id') && ($isSuperAdmin || $hasAdminPermission)) {
             $agencia = Agencia::find($request->agencia_id);
