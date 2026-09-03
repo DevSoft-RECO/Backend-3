@@ -144,22 +144,37 @@ class RegistroController extends Controller
         // 2. Validación
         $data = $request->validate([
             'agencia_id'            => 'required|exists:cartilla_agencias,id',
-            'codigo_cliente'        => 'required|regex:/^[0-9]{5,7}$/',
             'accion'                => 'required|in:CREDITO_NUEVO,PLAZO_FIJO,MOTOCICLETA,PAGO_PUNTUAL',
             'tipo_operacion'        => 'nullable|string',
+            'codigo_cliente'        => [
+                'nullable',
+                function ($attribute, $value, $fail) use ($request) {
+                    $isMotoAlContado = $request->input('accion') === 'MOTOCICLETA' && $request->input('tipo_operacion') === 'AL CONTADO';
+                    if (!$isMotoAlContado) {
+                        if (empty($value)) {
+                            return $fail('El Código Cliente es requerido para esta acción.');
+                        }
+                        if (!preg_match('/^[0-9]{5,7}$/', $value)) {
+                            return $fail('El Código Cliente debe tener al menos 5 dígitos.');
+                        }
+                    }
+                }
+            ],
             'monto'                 => 'required|numeric|min:0.01',
             'numero_cuenta'         => [
                 'nullable',
                 'string',
                 function ($attribute, $value, $fail) use ($request, $prefijo, $digitos) {
-                    // Ciertos tipos no requieren cuenta
-                    $accion = $request->input('accion');
-                    if (in_array($accion, ['CREDITO_NUEVO', 'PLAZO_FIJO', 'PAGO_PUNTUAL'])) {
-                        if (empty($value)) {
-                            return $fail('El número de cuenta es requerido para esta acción.');
-                        }
-                        if (!preg_match("/^{$prefijo}[0-9]{" . ($digitos - strlen($prefijo)) . "}$/", $value)) {
-                            return $fail("La cuenta debe empezar con {$prefijo} y tener exactamente {$digitos} dígitos.");
+                    $isMotoAlContado = $request->input('accion') === 'MOTOCICLETA' && $request->input('tipo_operacion') === 'AL CONTADO';
+                    if (!$isMotoAlContado) {
+                        $accion = $request->input('accion');
+                        if (in_array($accion, ['CREDITO_NUEVO', 'PLAZO_FIJO', 'PAGO_PUNTUAL'])) {
+                            if (empty($value)) {
+                                return $fail('El número de cuenta es requerido para esta acción.');
+                            }
+                            if (!preg_match("/^{$prefijo}[0-9]{" . ($digitos - strlen($prefijo)) . "}$/", $value)) {
+                                return $fail("La cuenta debe empezar con {$prefijo} y tener exactamente {$digitos} dígitos.");
+                            }
                         }
                     }
                 }
@@ -337,21 +352,37 @@ class RegistroController extends Controller
 
         $data = $request->validate([
             'agencia_id'            => 'required|exists:cartilla_agencias,id',
-            'codigo_cliente'        => 'required|regex:/^[0-9]{5,7}$/',
             'accion'                => 'required|in:CREDITO_NUEVO,PLAZO_FIJO,MOTOCICLETA,PAGO_PUNTUAL',
             'tipo_operacion'        => 'nullable|string',
+            'codigo_cliente'        => [
+                'nullable',
+                function ($attribute, $value, $fail) use ($request) {
+                    $isMotoAlContado = $request->input('accion') === 'MOTOCICLETA' && $request->input('tipo_operacion') === 'AL CONTADO';
+                    if (!$isMotoAlContado) {
+                        if (empty($value)) {
+                            return $fail('El Código Cliente es requerido para esta acción.');
+                        }
+                        if (!preg_match('/^[0-9]{5,7}$/', $value)) {
+                            return $fail('El Código Cliente debe tener al menos 5 dígitos.');
+                        }
+                    }
+                }
+            ],
             'monto'                 => 'required|numeric|min:0.01',
             'numero_cuenta'         => [
                 'nullable',
                 'string',
                 function ($attribute, $value, $fail) use ($request, $prefijo, $digitos) {
-                    $accion = $request->input('accion');
-                    if (in_array($accion, ['CREDITO_NUEVO', 'PLAZO_FIJO', 'PAGO_PUNTUAL'])) {
-                        if (empty($value)) {
-                            return $fail('El número de cuenta es requerido para esta acción.');
-                        }
-                        if (!preg_match("/^{$prefijo}[0-9]{" . ($digitos - strlen($prefijo)) . "}$/", $value)) {
-                            return $fail("La cuenta debe empezar con {$prefijo} y tener exactamente {$digitos} dígitos.");
+                    $isMotoAlContado = $request->input('accion') === 'MOTOCICLETA' && $request->input('tipo_operacion') === 'AL CONTADO';
+                    if (!$isMotoAlContado) {
+                        $accion = $request->input('accion');
+                        if (in_array($accion, ['CREDITO_NUEVO', 'PLAZO_FIJO', 'PAGO_PUNTUAL'])) {
+                            if (empty($value)) {
+                                return $fail('El número de cuenta es requerido para esta acción.');
+                            }
+                            if (!preg_match("/^{$prefijo}[0-9]{" . ($digitos - strlen($prefijo)) . "}$/", $value)) {
+                                return $fail("La cuenta debe empezar con {$prefijo} y tener exactamente {$digitos} dígitos.");
+                            }
                         }
                     }
                 }
