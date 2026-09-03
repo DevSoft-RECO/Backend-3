@@ -8,6 +8,7 @@ use App\Models\Cartilla\InventarioStock;
 use App\Models\Cartilla\MovimientoInventario;
 use App\Models\Cartilla\HistorialRegistro;
 use App\Models\Cartilla\Configuracion;
+use App\Models\Cartilla\Agencia;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
