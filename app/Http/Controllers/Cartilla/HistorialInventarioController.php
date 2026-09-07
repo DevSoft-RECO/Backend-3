@@ -21,16 +21,20 @@ class HistorialInventarioController extends Controller
 
         if (!$isSuperAdmin && !$hasAdminPermission) {
             $agenciaCodigo = $user->agencia_id ?? $user->idagencia;
-            $agenciaId = \App\Models\Cartilla\Agencia::where('codigo', $agenciaCodigo)->value('id');
-            $query->where(function($q) use ($agenciaCodigo, $agenciaId) {
-                $q->whereHas('movimiento.agencia', function($subQ) use ($agenciaCodigo) {
-                    $subQ->where('codigo', $agenciaCodigo);
-                });
-                if ($agenciaId) {
-                    $q->orWhere('snapshot->agencia_id', $agenciaId)
+            $agenciaObj = \App\Models\Cartilla\Agencia::where('codigo', $agenciaCodigo)->first() ?? \App\Models\Cartilla\Agencia::find($agenciaCodigo);
+            $agenciaId = $agenciaObj ? $agenciaObj->id : null;
+            
+            if ($agenciaId) {
+                $query->where(function($q) use ($agenciaId) {
+                    $q->whereHas('movimiento', function($subQ) use ($agenciaId) {
+                        $subQ->where('agencia_id', $agenciaId)
+                             ->orWhere('agencia_destino_id', $agenciaId);
+                    })->orWhere('snapshot->agencia_id', $agenciaId)
                       ->orWhere('snapshot->agencia_destino_id', $agenciaId);
-                }
-            });
+                });
+            } else {
+                $query->where('id', '<', 0); // Forzar 0 resultados si no tiene agencia
+            }
         }
 
         if ($request->filled('estado_cambio')) {

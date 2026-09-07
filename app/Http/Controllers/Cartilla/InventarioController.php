@@ -23,9 +23,18 @@ class InventarioController extends Controller
         $hasAdminPermission = $user->hasPermissionTo('admin_promocion');
 
         if (!$isSuperAdmin && !$hasAdminPermission) {
-            $query->whereHas('agencia', function($q) use ($user) {
-                $q->where('codigo', $user->agencia_id ?? $user->idagencia);
-            });
+            $agenciaCodigo = $user->agencia_id ?? $user->idagencia;
+            $agenciaObj = \App\Models\Cartilla\Agencia::where('codigo', $agenciaCodigo)->first() ?? \App\Models\Cartilla\Agencia::find($agenciaCodigo);
+            $agenciaId = $agenciaObj ? $agenciaObj->id : null;
+
+            if ($agenciaId) {
+                $query->where(function($q) use ($agenciaId) {
+                    $q->where('agencia_id', $agenciaId)
+                      ->orWhere('agencia_destino_id', $agenciaId);
+                });
+            } else {
+                $query->where('id', '<', 0); // Forzar 0 resultados si no tiene agencia
+            }
         }
 
         if ($request->filled('tipo_movimiento')) {
