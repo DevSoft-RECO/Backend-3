@@ -317,11 +317,13 @@ class ColocacionController extends Controller
 
         // Verificar que el usuario pertenezca a la agencia del pago (salvo admin)
         $isSuperAdmin = $user->hasRole('Super Admin');
-        $hasAdminPermission = $user->hasPermissionTo('cartilla_mercadeo');
+        $hasAdminPermission = $user->hasPermissionTo('cartilla_mercadeo') || $user->hasPermissionTo('admin_promocion');
 
         if (!$isSuperAdmin && !$hasAdminPermission) {
-            $userAgencia = $user->agencia_id ?? $user->idagencia;
-            if ($pago->agencia->codigo !== $userAgencia) {
+            $userAgenciaCodigo = $user->agencia_id ?? $user->idagencia;
+            $userAgenciaObj = Agencia::where('codigo', $userAgenciaCodigo)->first() ?? Agencia::find($userAgenciaCodigo);
+            
+            if (!$userAgenciaObj || $pago->agencia_id !== $userAgenciaObj->id) {
                 return response()->json(['error' => 'No tienes permiso para reclamar pagos de otra agencia.'], 403);
             }
         }
