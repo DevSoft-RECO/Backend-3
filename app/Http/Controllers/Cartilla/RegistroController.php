@@ -169,7 +169,7 @@ class RegistroController extends Controller
                     $isMotoAlContado = $request->input('accion') === 'MOTOCICLETA' && $request->input('tipo_operacion') === 'AL CONTADO';
                     if (!$isMotoAlContado) {
                         $accion = $request->input('accion');
-                        if (in_array($accion, ['CREDITO_NUEVO', 'PLAZO_FIJO', 'PAGO_PUNTUAL'])) {
+                        if (in_array($accion, ['CREDITO_NUEVO', 'PLAZO_FIJO', 'PAGO_PUNTUAL', 'MOTOCICLETA'])) {
                             if (empty($value)) {
                                 return $fail('El número de cuenta es requerido para esta acción.');
                             }
@@ -393,7 +393,7 @@ class RegistroController extends Controller
                     $isMotoAlContado = $request->input('accion') === 'MOTOCICLETA' && $request->input('tipo_operacion') === 'AL CONTADO';
                     if (!$isMotoAlContado) {
                         $accion = $request->input('accion');
-                        if (in_array($accion, ['CREDITO_NUEVO', 'PLAZO_FIJO', 'PAGO_PUNTUAL'])) {
+                        if (in_array($accion, ['CREDITO_NUEVO', 'PLAZO_FIJO', 'PAGO_PUNTUAL', 'MOTOCICLETA'])) {
                             if (empty($value)) {
                                 return $fail('El número de cuenta es requerido para esta acción.');
                             }
