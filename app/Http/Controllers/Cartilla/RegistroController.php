@@ -340,6 +340,22 @@ class RegistroController extends Controller
                 ]);
             }
 
+            // F. Si se creó manualmente un pago puntual, buscar si existía como pendiente en Colocaciones y marcarlo como reclamado
+            if ($data['accion'] === 'PAGO_PUNTUAL' && !empty($data['numero_cuenta'])) {
+                $pagosPendientes = \App\Models\Cartilla\ColocacionPago::where('numero_cuenta', $data['numero_cuenta'])
+                    ->where('estado', 'PENDIENTE')
+                    ->get();
+                    
+                foreach ($pagosPendientes as $pagoPendiente) {
+                    $pagoPendiente->update([
+                        'estado'                   => 'RECLAMADO',
+                        'registro_id'              => $registro->id,
+                        'reclamado_por_usuario_id' => $user->id,
+                        'reclamado_en'             => now(),
+                    ]);
+                }
+            }
+
             return response()->json(['msg' => 'Registro creado con éxito', 'data' => $registro], 201);
         });
     }
