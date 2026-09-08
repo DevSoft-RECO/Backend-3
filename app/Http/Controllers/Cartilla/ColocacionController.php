@@ -242,8 +242,11 @@ class ColocacionController extends Controller
     public function pendientes(Request $request)
     {
         $user = $request->user();
-        $query = ColocacionPago::with(['agencia'])
-            ->where('estado', 'PENDIENTE');
+        $query = ColocacionPago::with(['agencia']);
+
+        if ($request->filled('estado')) {
+            $query->where('estado', $request->estado);
+        }
 
         // Filtrar por rango de fechas de la promoción configurada
         $mecanica = Configuracion::where('clave', 'mecanica')->first()?->valor ?? [];

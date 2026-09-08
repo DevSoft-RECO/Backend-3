@@ -577,7 +577,18 @@ class RegistroController extends Controller
             // B. Revertir stocks e inventario de Kárdex
             $this->revertirInventarioRegistro($registro);
 
-            // C. Eliminar registro
+            // C. Liberar pago automático asociado (si aplica) para que pueda volver a ser reclamado
+            $pagoAsociado = \App\Models\Cartilla\ColocacionPago::where('registro_id', $registro->id)->first();
+            if ($pagoAsociado) {
+                $pagoAsociado->update([
+                    'estado'                   => 'PENDIENTE',
+                    'registro_id'              => null,
+                    'reclamado_por_usuario_id' => null,
+                    'reclamado_en'             => null,
+                ]);
+            }
+
+            // D. Eliminar registro
             $registro->delete();
 
             return response()->json(['msg' => 'Registro eliminado con éxito']);
