@@ -19,19 +19,23 @@ class ExportacionController extends Controller
         $filename = 'cartilla_llamadas_' . now()->format('Ymd_His') . '.csv';
         return $this->streamCsv($filename, [
             'ID', 'Fecha Llamada', 'Agencia', 'Usuario (Asesor)', 'Código Cliente', 'Cuenta Asociada', 'Monto Pago', 'Fecha Pago', 'Estado Llamada', 'Notas'
-        ], $query, function($row) {
-            return [
-                $row->id,
-                $row->created_at->format('Y-m-d H:i:s'),
-                $row->agencia->nombre ?? 'N/A',
-                $row->usuario->name ?? $row->usuario->username ?? 'N/A',
-                $row->pago->codigo_cliente ?? 'N/A',
-                $row->pago->numero_cuenta ?? 'N/A',
-                $row->pago->monto ?? '0.00',
-                $row->pago->fecha_pago ? $row->pago->fecha_pago->format('Y-m-d') : 'N/A',
-                $row->estado,
-                $row->notas,
-            ];
+        ], function($file) use ($query) {
+            $query->chunk(500, function($llamadas) use ($file) {
+                foreach ($llamadas as $row) {
+                    fputcsv($file, $this->encodeRow([
+                        $row->id,
+                        $row->created_at->format('Y-m-d H:i:s'),
+                        $row->agencia->nombre ?? 'N/A',
+                        $row->usuario->name ?? $row->usuario->username ?? 'N/A',
+                        $row->pago->codigo_cliente ?? 'N/A',
+                        $row->pago->numero_cuenta ?? 'N/A',
+                        $row->pago->monto ?? '0.00',
+                        $row->pago->fecha_pago ? (\Carbon\Carbon::parse($row->pago->fecha_pago)->format('Y-m-d')) : 'N/A',
+                        $row->estado,
+                        $row->notas,
+                    ]));
+                }
+            });
         });
     }
 
