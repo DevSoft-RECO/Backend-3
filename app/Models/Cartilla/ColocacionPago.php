@@ -49,4 +49,9 @@ class ColocacionPago extends Model
     {
         return $this->belongsTo(User::class, 'reclamado_por_usuario_id');
     }
+
+    public function llamadas()
+    {
+        return $this->hasMany(ColocacionLlamada::class, 'pago_id')->latest();
+    }
 }

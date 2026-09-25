@@ -109,11 +109,13 @@ Route::middleware('sso')->group(function () {
         Route::get('/exportar/historial-registros', [\App\Http\Controllers\Cartilla\ExportacionController::class, 'exportarHistorialRegistros']);
         Route::get('/exportar/movimientos', [\App\Http\Controllers\Cartilla\ExportacionController::class, 'exportarMovimientos']);
         Route::get('/exportar/historial-inventario', [\App\Http\Controllers\Cartilla\ExportacionController::class, 'exportarHistorialInventario']);
+        Route::get('/exportar/llamadas', [\App\Http\Controllers\Cartilla\ExportacionController::class, 'exportarLlamadas']);
 
         // Colocaciones / Pagos automáticos
         Route::post('/colocaciones/importar', [\App\Http\Controllers\Cartilla\ColocacionController::class, 'importar']);
         Route::get('/colocaciones/pendientes', [\App\Http\Controllers\Cartilla\ColocacionController::class, 'pendientes']);
         Route::post('/colocaciones/{pago}/reclamar', [\App\Http\Controllers\Cartilla\ColocacionController::class, 'reclamar']);
+        Route::post('/colocaciones/{pago}/llamadas', [\App\Http\Controllers\Cartilla\ColocacionController::class, 'registrarLlamada']);
     });
 });
 

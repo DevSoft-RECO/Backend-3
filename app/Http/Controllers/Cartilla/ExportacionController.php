@@ -12,6 +12,29 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ExportacionController extends Controller
 {
+    public function exportarLlamadas(Request $request)
+    {
+        $query = \App\Models\Cartilla\ColocacionLlamada::with(['agencia', 'usuario', 'pago']);
+
+        $filename = 'cartilla_llamadas_' . now()->format('Ymd_His') . '.csv';
+        return $this->streamCsv($filename, [
+            'ID', 'Fecha Llamada', 'Agencia', 'Usuario (Asesor)', 'Código Cliente', 'Cuenta Asociada', 'Monto Pago', 'Fecha Pago', 'Estado Llamada', 'Notas'
+        ], $query, function($row) {
+            return [
+                $row->id,
+                $row->created_at->format('Y-m-d H:i:s'),
+                $row->agencia->nombre ?? 'N/A',
+                $row->usuario->name ?? $row->usuario->username ?? 'N/A',
+                $row->pago->codigo_cliente ?? 'N/A',
+                $row->pago->numero_cuenta ?? 'N/A',
+                $row->pago->monto ?? '0.00',
+                $row->pago->fecha_pago ? $row->pago->fecha_pago->format('Y-m-d') : 'N/A',
+                $row->estado,
+                $row->notas,
+            ];
+        });
+    }
+
     public function exportarRegistros(Request $request)
     {
         $query = Registro::with(['agencia']);

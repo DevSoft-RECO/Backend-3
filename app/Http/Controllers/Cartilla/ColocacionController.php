@@ -242,7 +242,7 @@ class ColocacionController extends Controller
     public function pendientes(Request $request)
     {
         $user = $request->user();
-        $query = ColocacionPago::with(['agencia'])
+        $query = ColocacionPago::with(['agencia', 'llamadas', 'llamadas.usuario'])
             ->where('estado', 'PENDIENTE');
 
         // Filtrar por rango de fechas de la promoción configurada
@@ -256,21 +256,7 @@ class ColocacionController extends Controller
             $query->whereDate('fecha_pago', '<=', $fechaFinSimple);
         }
 
-        // Aislamiento por agencia si no es admin de Mercadeo
-        $isSuperAdmin = $user->hasRole('Super Admin');
-        $hasAdminPermission = $user->hasPermissionTo('cartilla_mercadeo') || $user->hasPermissionTo('admin_promocion');
-
-        if (!$isSuperAdmin && !$hasAdminPermission) {
-            $agenciaCodigo = $user->agencia_id ?? $user->idagencia;
-            $userAgencia = Agencia::where('codigo', $agenciaCodigo)->first() ?? Agencia::find($agenciaCodigo);
-            if ($userAgencia) {
-                $query->where('agencia_id', $userAgencia->id);
-            } else {
-                $query->whereHas('agencia', function ($q) use ($agenciaCodigo) {
-                    $q->where('codigo', $agenciaCodigo);
-                });
-            }
-        }
+        // Se remueve el aislamiento por agencia para que todas las agencias puedan ver todos los pagos
 
         if ($request->filled('agencia_id')) {
             $query->where('agencia_id', $request->agencia_id);
@@ -315,18 +301,8 @@ class ColocacionController extends Controller
             return response()->json(['error' => 'La fecha de este pago es posterior a la finalización de la promoción actual.'], 422);
         }
 
-        // Verificar que el usuario pertenezca a la agencia del pago (salvo admin)
-        $isSuperAdmin = $user->hasRole('Super Admin');
-        $hasAdminPermission = $user->hasPermissionTo('cartilla_mercadeo') || $user->hasPermissionTo('admin_promocion');
-
-        if (!$isSuperAdmin && !$hasAdminPermission) {
-            $userAgenciaCodigo = $user->agencia_id ?? $user->idagencia;
-            $userAgenciaObj = Agencia::where('codigo', $userAgenciaCodigo)->first() ?? Agencia::find($userAgenciaCodigo);
-            
-            if (!$userAgenciaObj || $pago->agencia_id !== $userAgenciaObj->id) {
-                return response()->json(['error' => 'No tienes permiso para reclamar pagos de otra agencia.'], 403);
-            }
-        }
+        $userAgenciaCodigo = $user->agencia_id ?? $user->idagencia;
+        $userAgenciaObj = Agencia::where('codigo', $userAgenciaCodigo)->first() ?? Agencia::find($userAgenciaCodigo);
 
         $data = $request->validate([
             'cartilla_nueva'        => 'boolean',
@@ -337,7 +313,8 @@ class ColocacionController extends Controller
 
         $mecanica = Configuracion::where('clave', 'mecanica')->first()?->valor ?? [];
         $stickers = $mecanica['stickers_pago_puntual'] ?? 5;
-        $agenciaId = $pago->agencia_id;
+        // Asignar el consumo de inventario y el registro a la agencia del usuario que atiende (si existe), si no, a la del pago.
+        $agenciaId = $userAgenciaObj ? $userAgenciaObj->id : $pago->agencia_id;
 
         return DB::transaction(function () use ($pago, $data, $user, $stickers, $agenciaId) {
             // Lock en el pago para evitar race conditions simultáneas
@@ -482,6 +459,35 @@ class ColocacionController extends Controller
 
             return response()->json(['msg' => 'Pago automático reclamado y registrado con éxito', 'data' => $registro], 201);
         });
+    }
+
+    /**
+     * Registrar una llamada para un pago automático pendiente
+     */
+    public function registrarLlamada(Request $request, ColocacionPago $pago)
+    {
+        $user = $request->user();
+        
+        $data = $request->validate([
+            'estado' => 'required|string|in:Pendiente,No contesta,Completada',
+            'notas' => 'nullable|string|max:1000',
+        ]);
+
+        $userAgenciaCodigo = $user->agencia_id ?? $user->idagencia;
+        $userAgenciaObj = Agencia::where('codigo', $userAgenciaCodigo)->first() ?? Agencia::find($userAgenciaCodigo);
+
+        $llamada = \App\Models\Cartilla\ColocacionLlamada::create([
+            'pago_id' => $pago->id,
+            'agencia_id' => $userAgenciaObj?->id ?? $pago->agencia_id,
+            'usuario_id' => $user->id,
+            'estado' => $data['estado'],
+            'notas' => $data['notas'],
+        ]);
+
+        return response()->json([
+            'msg' => 'Llamada registrada correctamente.',
+            'data' => $llamada
+        ], 201);
     }
 
     private function detectarDelimitador($content)
