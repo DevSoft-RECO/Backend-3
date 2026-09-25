@@ -145,7 +145,7 @@ class RegistroController extends Controller
         // 2. Validación
         $data = $request->validate([
             'agencia_id'            => 'required|exists:cartilla_agencias,id',
-            'accion'                => 'required|in:CREDITO_NUEVO,PLAZO_FIJO,MOTOCICLETA,PAGO_PUNTUAL',
+            'accion'                => 'required|in:CREDITO_NUEVO,PLAZO_FIJO,MOTOCICLETA,PAGO_PUNTUAL,EXTRAORDINARIO',
             'tipo_operacion'        => 'nullable|string',
             'codigo_cliente'        => [
                 'nullable',
@@ -155,7 +155,7 @@ class RegistroController extends Controller
                         if (empty($value)) {
                             return $fail('El Código Cliente es requerido para esta acción.');
                         }
-                        if (!preg_match('/^[0-9]{5,7}$/', $value)) {
+                        if (!preg_match('/^[0-9]{5,}$/', $value)) {
                             return $fail('El Código Cliente debe tener al menos 5 dígitos.');
                         }
                     }
@@ -169,7 +169,7 @@ class RegistroController extends Controller
                     $isMotoAlContado = $request->input('accion') === 'MOTOCICLETA' && $request->input('tipo_operacion') === 'AL CONTADO';
                     if (!$isMotoAlContado) {
                         $accion = $request->input('accion');
-                        if (in_array($accion, ['CREDITO_NUEVO', 'PLAZO_FIJO', 'PAGO_PUNTUAL', 'MOTOCICLETA'])) {
+                        if (in_array($accion, ['CREDITO_NUEVO', 'PLAZO_FIJO', 'PAGO_PUNTUAL', 'MOTOCICLETA', 'EXTRAORDINARIO'])) {
                             if (empty($value)) {
                                 return $fail('El número de cuenta es requerido para esta acción.');
                             }
@@ -217,6 +217,9 @@ class RegistroController extends Controller
                     break;
                 case 'PAGO_PUNTUAL':
                     $stickers = $mecanica['stickers_pago_puntual'] ?? 5;
+                    break;
+                case 'EXTRAORDINARIO':
+                    $stickers = 0;
                     break;
             }
 
@@ -369,7 +372,7 @@ class RegistroController extends Controller
 
         $data = $request->validate([
             'agencia_id'            => 'required|exists:cartilla_agencias,id',
-            'accion'                => 'required|in:CREDITO_NUEVO,PLAZO_FIJO,MOTOCICLETA,PAGO_PUNTUAL',
+            'accion'                => 'required|in:CREDITO_NUEVO,PLAZO_FIJO,MOTOCICLETA,PAGO_PUNTUAL,EXTRAORDINARIO',
             'tipo_operacion'        => 'nullable|string',
             'codigo_cliente'        => [
                 'nullable',
@@ -379,7 +382,7 @@ class RegistroController extends Controller
                         if (empty($value)) {
                             return $fail('El Código Cliente es requerido para esta acción.');
                         }
-                        if (!preg_match('/^[0-9]{5,7}$/', $value)) {
+                        if (!preg_match('/^[0-9]{5,}$/', $value)) {
                             return $fail('El Código Cliente debe tener al menos 5 dígitos.');
                         }
                     }
@@ -393,7 +396,7 @@ class RegistroController extends Controller
                     $isMotoAlContado = $request->input('accion') === 'MOTOCICLETA' && $request->input('tipo_operacion') === 'AL CONTADO';
                     if (!$isMotoAlContado) {
                         $accion = $request->input('accion');
-                        if (in_array($accion, ['CREDITO_NUEVO', 'PLAZO_FIJO', 'PAGO_PUNTUAL', 'MOTOCICLETA'])) {
+                        if (in_array($accion, ['CREDITO_NUEVO', 'PLAZO_FIJO', 'PAGO_PUNTUAL', 'MOTOCICLETA', 'EXTRAORDINARIO'])) {
                             if (empty($value)) {
                                 return $fail('El número de cuenta es requerido para esta acción.');
                             }
@@ -455,6 +458,9 @@ class RegistroController extends Controller
                     break;
                 case 'PAGO_PUNTUAL':
                     $stickers = $mecanica['stickers_pago_puntual'] ?? 5;
+                    break;
+                case 'EXTRAORDINARIO':
+                    $stickers = 0;
                     break;
             }
 
