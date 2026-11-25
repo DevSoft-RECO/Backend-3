@@ -71,6 +71,67 @@ class ColocacionController extends Controller
             // Los pagos ya RECLAMADOS se conservan intactos por auditoría y registros asociados.
             ColocacionPago::where('estado', 'PENDIENTE')->delete();
 
+            $fechaInicioDate = !empty($fechaInicioPromo) ? substr($fechaInicioPromo, 0, 10) : null;
+            $fechaFinDate = !empty($fechaFinPromo) ? substr($fechaFinPromo, 0, 10) : null;
+            $digitosInt = intval($digitos);
+
+            // Precargar en memoria registros existentes para evitar miles de consultas N+1 dentro del bucle
+            $registradosEnCartilla = [];
+            $registrosQuery = DB::table('cartilla_registros')
+                ->select('numero_cuenta', 'source_payment_date', 'created_at')
+                ->whereNotNull('numero_cuenta');
+
+            if ($fechaInicioDate) {
+                $registrosQuery->where(function ($q) use ($fechaInicioDate) {
+                    $q->where('source_payment_date', '>=', $fechaInicioDate)
+                      ->orWhere('created_at', '>=', $fechaInicioDate . ' 00:00:00');
+                });
+            }
+            if ($fechaFinDate) {
+                $registrosQuery->where(function ($q) use ($fechaFinDate) {
+                    $q->where('source_payment_date', '<=', $fechaFinDate)
+                      ->orWhere('created_at', '<=', $fechaFinDate . ' 23:59:59');
+                });
+            }
+
+            foreach ($registrosQuery->cursor() as $reg) {
+                $cuenta = $reg->numero_cuenta;
+                if (!empty($reg->source_payment_date)) {
+                    $registradosEnCartilla[$cuenta . '|' . substr((string) $reg->source_payment_date, 0, 10)] = true;
+                }
+                if (!empty($reg->created_at)) {
+                    $registradosEnCartilla[$cuenta . '|' . substr((string) $reg->created_at, 0, 10)] = true;
+                }
+            }
+
+            // Precargar pagos que permanecieron en la tabla (RECLAMADO) para deduplicación en O(1)
+            $registradosEnPagos = [];
+            foreach (DB::table('cartilla_colocaciones_pagos')->select('numero_cuenta', 'fecha_pago')->cursor() as $pagoPrevio) {
+                $registradosEnPagos[$pagoPrevio->numero_cuenta . '|' . substr((string) $pagoPrevio->fecha_pago, 0, 10)] = true;
+            }
+
+            // Parseador de fechas reutilizable fuera del bucle (evita instanciar Carbon miles de veces)
+            $parseFecha = function ($str) {
+                $trimmed = trim($str);
+                if (preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $trimmed, $m)) {
+                    return checkdate((int) $m[2], (int) $m[3], (int) $m[1]) ? $trimmed : null;
+                }
+                $digitsOnly = preg_replace('/\D/', '', $trimmed);
+                if (strlen($digitsOnly) === 8) {
+                    $y = (int) substr($digitsOnly, 0, 4);
+                    $mo = (int) substr($digitsOnly, 4, 2);
+                    $d = (int) substr($digitsOnly, 6, 2);
+                    if (checkdate($mo, $d, $y)) {
+                        return sprintf('%04d-%02d-%02d', $y, $mo, $d);
+                    }
+                }
+                try {
+                    return Carbon::parse($trimmed)->format('Y-m-d');
+                } catch (\Exception $e) {
+                    return null;
+                }
+            };
+
             $totalFilas = 0;
             $filasElegibles = 0;
             $descartes = [
@@ -93,9 +154,14 @@ class ColocacionController extends Controller
                 'filas_elegibles'=> 0,
             ]);
 
-            for ($i = 1; $i < count($lines); $i++) {
+            $now = now()->format('Y-m-d H:i:s');
+            $batch = [];
+            $batchSize = 500;
+            $totalLines = count($lines);
+
+            for ($i = 1; $i < $totalLines; $i++) {
                 $line = trim($lines[$i]);
-                if (empty($line)) continue;
+                if ($line === '') continue;
 
                 $totalFilas++;
                 $row = str_getcsv($line, $delimiter);
@@ -108,19 +174,19 @@ class ColocacionController extends Controller
                 }
 
                 $codigoCliente = preg_replace('/\D/', '', $row[$indexes['CLIENTE']] ?? '');
-                if (empty($codigoCliente)) {
+                if ($codigoCliente === '') {
                     $descartes['cliente_invalido']++;
                     continue;
                 }
 
                 $numeroCuenta = preg_replace('/\D/', '', $row[$indexes['NUMERODOCUMENTO']] ?? '');
-                if (empty($numeroCuenta)) {
+                if ($numeroCuenta === '') {
                     $descartes['cuenta_invalida']++;
                     continue;
                 }
 
                 // Si hay prefijo configurado, validar que inicie con él si tiene la longitud esperada
-                if (!empty($prefijo) && strpos($numeroCuenta, $prefijo) !== 0 && strlen($numeroCuenta) === intval($digitos)) {
+                if (!empty($prefijo) && strpos($numeroCuenta, $prefijo) !== 0 && strlen($numeroCuenta) === $digitosInt) {
                     $descartes['prefijo_no_coincide']++;
                     continue;
                 }
@@ -128,25 +194,10 @@ class ColocacionController extends Controller
                 $rawFechaPago = trim($row[$indexes['FECHAULTIMOPAGO']] ?? '');
                 $rawFechaSugerida = trim($row[$indexes['FECHAULTIMOPAGOCAPITAL']] ?? '');
 
-                if (empty($rawFechaPago) || empty($rawFechaSugerida)) {
+                if ($rawFechaPago === '' || $rawFechaSugerida === '') {
                     $descartes['fecha_invalida']++;
                     continue;
                 }
-
-                // Parsear fecha flexiblemente (ej: 20260210, 20260831, 2026-02-10)
-                $parseFecha = function ($str) {
-                    $digitsOnly = preg_replace('/\D/', '', $str);
-                    if (strlen($digitsOnly) === 8) {
-                        try {
-                            return Carbon::createFromFormat('Ymd', $digitsOnly)->format('Y-m-d');
-                        } catch (\Exception $e) {}
-                    }
-                    try {
-                        return Carbon::parse(trim($str))->format('Y-m-d');
-                    } catch (\Exception $e) {
-                        return null;
-                    }
-                };
 
                 $fechaPagoStrFormatted = $parseFecha($rawFechaPago);
                 $fechaSugerida = $parseFecha($rawFechaSugerida);
@@ -167,47 +218,33 @@ class ColocacionController extends Controller
                 }
 
                 // Validar rango de fechas de la promoción comparando únicamente fechas (YYYY-MM-DD)
-                if (!empty($fechaInicioPromo)) {
-                    $fechaInicioDate = substr($fechaInicioPromo, 0, 10);
-                    if ($fechaPagoStrFormatted < $fechaInicioDate) {
-                        $descartes['fuera_rango_promocion']++;
-                        continue;
-                    }
+                if ($fechaInicioDate && $fechaPagoStrFormatted < $fechaInicioDate) {
+                    $descartes['fuera_rango_promocion']++;
+                    continue;
                 }
-                if (!empty($fechaFinPromo)) {
-                    $fechaFinDate = substr($fechaFinPromo, 0, 10);
-                    if ($fechaPagoStrFormatted > $fechaFinDate) {
-                        $descartes['fuera_rango_promocion']++;
-                        continue;
-                    }
+                if ($fechaFinDate && $fechaPagoStrFormatted > $fechaFinDate) {
+                    $descartes['fuera_rango_promocion']++;
+                    continue;
                 }
 
                 $fechaPago = $fechaPagoStrFormatted;
+                $clavePago = $numeroCuenta . '|' . $fechaPago;
 
-                // Deduplicar contra registros ya creados en cartilla_registros
-                $yaRegistradoEnCartilla = Registro::where('numero_cuenta', $numeroCuenta)
-                    ->where(function ($q) use ($fechaPago) {
-                        $q->whereDate('source_payment_date', $fechaPago)
-                          ->orWhereDate('created_at', $fechaPago);
-                    })
-                    ->exists();
-
-                if ($yaRegistradoEnCartilla) {
+                // Deduplicar contra registros ya creados en cartilla_registros (en memoria O(1))
+                if (isset($registradosEnCartilla[$clavePago])) {
                     $descartes['ya_registrado']++;
                     continue;
                 }
 
-                // Deduplicar contra colocaciones_pagos previas
-                $yaEnPagos = ColocacionPago::where('numero_cuenta', $numeroCuenta)
-                    ->where('fecha_pago', $fechaPago)
-                    ->exists();
-
-                if ($yaEnPagos) {
+                // Deduplicar contra colocaciones_pagos previas y duplicados dentro del mismo CSV (en memoria O(1))
+                if (isset($registradosEnPagos[$clavePago])) {
                     $descartes['ya_registrado']++;
                     continue;
                 }
 
-                ColocacionPago::create([
+                $registradosEnPagos[$clavePago] = true;
+
+                $batch[] = [
                     'importacion_id'      => $importacion->id,
                     'agencia_id'          => $agenciaId,
                     'codigo_cliente'      => $codigoCliente,
@@ -216,9 +253,20 @@ class ColocacionController extends Controller
                     'fecha_pago'          => $fechaPago,
                     'fecha_sugerida_pago' => $fechaSugerida,
                     'estado'              => 'PENDIENTE',
-                ]);
+                    'created_at'          => $now,
+                    'updated_at'          => $now,
+                ];
+
+                if (count($batch) >= $batchSize) {
+                    ColocacionPago::insert($batch);
+                    $batch = [];
+                }
 
                 $filasElegibles++;
+            }
+
+            if (!empty($batch)) {
+                ColocacionPago::insert($batch);
             }
 
             $importacion->update([
