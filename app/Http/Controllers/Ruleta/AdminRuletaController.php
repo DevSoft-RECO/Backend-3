@@ -14,6 +14,7 @@ use Illuminate\Support\Str;
 class AdminRuletaController extends Controller
 {
     private const MAX_IMAGE_BYTES = 102400; // 100 KB
+    private const MAX_TITLE_IMAGE_BYTES = 184320; // 180 KB para nitidez 4K en banner de título
 
     public function index()
     {
@@ -43,10 +44,17 @@ class AdminRuletaController extends Controller
         $data = $request->validate([
             'nombre' => 'required|string|max:255',
             'descripcion' => 'nullable|string|max:1000',
+            'titulo_imagen' => 'nullable|image|mimes:png,webp|max:10240',
+            'usar_imagen_titulo' => 'sometimes|boolean',
             'agencia_o_evento' => 'nullable|string|max:255',
             'agencia_id' => 'nullable|integer|exists:cartilla_agencias,id',
             'activo' => 'sometimes|boolean',
         ]);
+
+        unset($data['titulo_imagen']);
+        if ($request->hasFile('titulo_imagen')) {
+            $data['titulo_imagen_path'] = $this->procesarYGuardarImagenTitulo($request->file('titulo_imagen'));
+        }
 
         $ruleta = Ruleta::create($data);
         $ruleta->load(['agencia:id,codigo,nombre', 'premios']);
@@ -70,10 +78,26 @@ class AdminRuletaController extends Controller
         $data = $request->validate([
             'nombre' => 'sometimes|required|string|max:255',
             'descripcion' => 'nullable|string|max:1000',
+            'titulo_imagen' => 'nullable|image|mimes:png,webp|max:10240',
+            'eliminar_titulo_imagen' => 'sometimes|boolean',
+            'usar_imagen_titulo' => 'sometimes|boolean',
             'agencia_o_evento' => 'nullable|string|max:255',
             'agencia_id' => 'nullable|integer|exists:cartilla_agencias,id',
             'activo' => 'sometimes|boolean',
         ]);
+
+        $eliminarTituloImagen = filter_var($data['eliminar_titulo_imagen'] ?? false, FILTER_VALIDATE_BOOLEAN);
+        unset($data['titulo_imagen'], $data['eliminar_titulo_imagen']);
+
+        if ($eliminarTituloImagen && $ruleta->titulo_imagen_path) {
+            $this->eliminarImagenFisica($ruleta->titulo_imagen_path);
+            $data['titulo_imagen_path'] = null;
+        }
+
+        if ($request->hasFile('titulo_imagen')) {
+            $this->eliminarImagenFisica($ruleta->titulo_imagen_path);
+            $data['titulo_imagen_path'] = $this->procesarYGuardarImagenTitulo($request->file('titulo_imagen'));
+        }
 
         $ruleta->update($data);
         $ruleta->load(['agencia:id,codigo,nombre', 'premios']);
@@ -87,6 +111,7 @@ class AdminRuletaController extends Controller
     public function destroy(Ruleta $ruleta)
     {
         // Limpiar imágenes físicas asociadas en public/uploads/ruleta
+        $this->eliminarImagenFisica($ruleta->titulo_imagen_path);
         foreach ($ruleta->premios as $premio) {
             $this->eliminarImagenFisica($premio->imagen_path);
         }
@@ -329,6 +354,97 @@ class AdminRuletaController extends Controller
             $nextW = max(96, (int) round($curW * 0.78));
             $nextH = max(96, (int) round($curH * 0.78));
             $resized = $this->redimensionarGd($workingImage, $curW, $curH, $nextW, $nextH, $useWebp);
+            imagedestroy($workingImage);
+            $workingImage = $resized;
+        }
+
+        if ($bestBinary !== null) {
+            file_put_contents($fullPath, $bestBinary);
+        }
+        imagedestroy($workingImage);
+
+        return 'uploads/ruleta/' . $filename;
+    }
+
+    /**
+     * Procesa la imagen de título (PNG/WebP sin fondo) conservando transparencia,
+     * recortando bordes transparentes vacíos y guardándola en public/uploads/ruleta/.
+     */
+    private function procesarYGuardarImagenTitulo(UploadedFile $file): string
+    {
+        $destDir = public_path('uploads/ruleta');
+        if (!is_dir($destDir)) {
+            mkdir($destDir, 0755, true);
+        }
+
+        $rawBytes = file_get_contents($file->getRealPath());
+        $srcImage = @imagecreatefromstring($rawBytes);
+
+        if (!$srcImage) {
+            $ext = strtolower($file->getClientOriginalExtension() ?: 'png');
+            $filename = 'titulo_' . Str::uuid()->toString() . '.' . $ext;
+            $file->move($destDir, $filename);
+            return 'uploads/ruleta/' . $filename;
+        }
+
+        imagealphablending($srcImage, false);
+        imagesavealpha($srcImage, true);
+
+        // Auto-recortar márgenes transparentes vacíos para aprovechar bien la caja del título
+        if (function_exists('imagecropauto')) {
+            $cropped = @imagecropauto($srcImage, IMG_CROP_TRANSPARENT);
+            if ($cropped !== false && imagesx($cropped) > 8 && imagesy($cropped) > 8) {
+                imagedestroy($srcImage);
+                $srcImage = $cropped;
+                imagealphablending($srcImage, false);
+                imagesavealpha($srcImage, true);
+            } elseif ($cropped !== false) {
+                imagedestroy($cropped);
+            }
+        }
+
+        $origW = imagesx($srcImage);
+        $origH = imagesy($srcImage);
+
+        // Máximo 1200x450 px conservando proporción (nitidez 4K)
+        $scale = min(1.0, 1200 / max($origW, 1), 450 / max($origH, 1));
+        $targetW = max(1, (int) round($origW * $scale));
+        $targetH = max(1, (int) round($origH * $scale));
+
+        $useWebp = function_exists('imagewebp');
+        $ext = $useWebp ? 'webp' : 'png';
+        $filename = 'titulo_' . Str::uuid()->toString() . '.' . $ext;
+        $fullPath = $destDir . DIRECTORY_SEPARATOR . $filename;
+
+        $workingImage = $this->redimensionarGd($srcImage, $origW, $origH, $targetW, $targetH, true);
+        imagedestroy($srcImage);
+
+        if (!$useWebp) {
+            imagepng($workingImage, $fullPath, 8);
+            imagedestroy($workingImage);
+            return 'uploads/ruleta/' . $filename;
+        }
+
+        $bestBinary = null;
+        for ($pass = 0; $pass < 4; $pass++) {
+            foreach ([88, 78, 68, 56, 44] as $quality) {
+                ob_start();
+                imagewebp($workingImage, null, $quality);
+                $binary = ob_get_clean();
+                $bestBinary = $binary;
+
+                if ($binary !== false && strlen($binary) <= self::MAX_TITLE_IMAGE_BYTES) {
+                    file_put_contents($fullPath, $binary);
+                    imagedestroy($workingImage);
+                    return 'uploads/ruleta/' . $filename;
+                }
+            }
+
+            $curW = imagesx($workingImage);
+            $curH = imagesy($workingImage);
+            $nextW = max(240, (int) round($curW * 0.80));
+            $nextH = max(80, (int) round($curH * 0.80));
+            $resized = $this->redimensionarGd($workingImage, $curW, $curH, $nextW, $nextH, true);
             imagedestroy($workingImage);
             $workingImage = $resized;
         }

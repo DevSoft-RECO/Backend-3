@@ -12,14 +12,27 @@ class Ruleta extends Model
     protected $fillable = [
         'nombre',
         'descripcion',
+        'titulo_imagen_path',
+        'usar_imagen_titulo',
         'agencia_o_evento',
         'agencia_id',
         'activo',
     ];
 
     protected $casts = [
+        'usar_imagen_titulo' => 'boolean',
         'activo' => 'boolean',
     ];
+
+    protected $appends = ['titulo_imagen_url'];
+
+    public function getTituloImagenUrlAttribute(): ?string
+    {
+        if (!$this->titulo_imagen_path) {
+            return null;
+        }
+        return url($this->titulo_imagen_path);
+    }
 
     public function agencia()
     {

@@ -124,6 +124,7 @@ Route::middleware('sso')->group(function () {
         Route::post('/ruletas', [\App\Http\Controllers\Ruleta\AdminRuletaController::class, 'store']);
         Route::get('/ruletas/{ruleta}', [\App\Http\Controllers\Ruleta\AdminRuletaController::class, 'show']);
         Route::put('/ruletas/{ruleta}', [\App\Http\Controllers\Ruleta\AdminRuletaController::class, 'update']);
+        Route::post('/ruletas/{ruleta}', [\App\Http\Controllers\Ruleta\AdminRuletaController::class, 'update']);
         Route::delete('/ruletas/{ruleta}', [\App\Http\Controllers\Ruleta\AdminRuletaController::class, 'destroy']);
 
         Route::post('/ruletas/{ruleta}/premios', [\App\Http\Controllers\Ruleta\AdminRuletaController::class, 'storePremio']);
