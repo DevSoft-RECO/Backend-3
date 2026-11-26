@@ -117,6 +117,30 @@ Route::middleware('sso')->group(function () {
         Route::post('/colocaciones/{pago}/reclamar', [\App\Http\Controllers\Cartilla\ColocacionController::class, 'reclamar']);
         Route::post('/colocaciones/{pago}/llamadas', [\App\Http\Controllers\Cartilla\ColocacionController::class, 'registrarLlamada']);
     });
+
+    // --- MÓDULO RULETA DE PREMIOS (ADMIN) ---
+    Route::prefix('ruleta')->group(function () {
+        Route::get('/ruletas', [\App\Http\Controllers\Ruleta\AdminRuletaController::class, 'index']);
+        Route::post('/ruletas', [\App\Http\Controllers\Ruleta\AdminRuletaController::class, 'store']);
+        Route::get('/ruletas/{ruleta}', [\App\Http\Controllers\Ruleta\AdminRuletaController::class, 'show']);
+        Route::put('/ruletas/{ruleta}', [\App\Http\Controllers\Ruleta\AdminRuletaController::class, 'update']);
+        Route::delete('/ruletas/{ruleta}', [\App\Http\Controllers\Ruleta\AdminRuletaController::class, 'destroy']);
+
+        Route::post('/ruletas/{ruleta}/premios', [\App\Http\Controllers\Ruleta\AdminRuletaController::class, 'storePremio']);
+        Route::put('/premios/{premio}', [\App\Http\Controllers\Ruleta\AdminRuletaController::class, 'updatePremio']);
+        Route::post('/premios/{premio}', [\App\Http\Controllers\Ruleta\AdminRuletaController::class, 'updatePremio']);
+        Route::delete('/premios/{premio}', [\App\Http\Controllers\Ruleta\AdminRuletaController::class, 'destroyPremio']);
+
+        Route::post('/ruletas/{ruleta}/reset-stock', [\App\Http\Controllers\Ruleta\AdminRuletaController::class, 'resetStock']);
+        Route::get('/ruletas/{ruleta}/giros', [\App\Http\Controllers\Ruleta\AdminRuletaController::class, 'giros']);
+    });
+});
+
+// === RULETA DE PREMIOS (APP MÓVIL PÚBLICA - SIN AUTENTICACIÓN) ===
+Route::prefix('public')->middleware('throttle:120,1')->group(function () {
+    Route::get('/ruletas', [\App\Http\Controllers\Ruleta\PublicRuletaController::class, 'index']);
+    Route::get('/ruletas/{ruleta}', [\App\Http\Controllers\Ruleta\PublicRuletaController::class, 'show']);
+    Route::post('/ruletas/{ruleta}/giros', [\App\Http\Controllers\Ruleta\PublicRuletaController::class, 'registrarGiro']);
 });
 
 // === BACKUP SYSTEM ===
