@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Ruleta;
 
 use App\Http\Controllers\Controller;
+use App\Models\Cartilla\Agencia;
 use App\Models\Ruleta\Ruleta;
 use App\Models\Ruleta\RuletaGiro;
 use App\Models\Ruleta\RuletaPremio;
@@ -11,6 +12,19 @@ use Illuminate\Support\Facades\DB;
 
 class PublicRuletaController extends Controller
 {
+    /**
+     * Lista las agencias activas para que la app móvil seleccione en qué agencia está instalada.
+     */
+    public function agencias()
+    {
+        $agencias = Agencia::where('activo', true)
+            ->orderBy('nombre')
+            ->get(['id', 'codigo', 'nombre']);
+
+        return response()->json([
+            'data' => $agencias,
+        ]);
+    }
     /**
      * Lista las ruletas activas disponibles para la app móvil (sin autenticación).
      */
@@ -89,6 +103,7 @@ class PublicRuletaController extends Controller
         $data = $request->validate([
             'premio_id' => 'required|integer',
             'dispositivo' => 'nullable|string|max:120',
+            'agencia_nombre' => 'nullable|string|max:255',
         ]);
 
         try {
@@ -113,6 +128,10 @@ class PublicRuletaController extends Controller
                     $stockDescontado = true;
                 }
 
+                $agenciaNombre = !empty($data['agencia_nombre'])
+                    ? trim($data['agencia_nombre'])
+                    : ($ruleta->agencia?->nombre ?: $ruleta->agencia_o_evento);
+
                 $giro = RuletaGiro::create([
                     'ruleta_id' => $ruleta->id,
                     'premio_id' => $premio->id,
@@ -120,6 +139,7 @@ class PublicRuletaController extends Controller
                     'es_premio' => $premio->es_premio,
                     'stock_descontado' => $stockDescontado,
                     'dispositivo' => $data['dispositivo'] ?? null,
+                    'agencia_nombre' => $agenciaNombre ?: null,
                     'created_at' => now(),
                 ]);
 
@@ -166,6 +186,7 @@ class PublicRuletaController extends Controller
             'imagen_path' => $p->imagen_path,
             'imagen_url' => $p->imagen_url,
             'modo_visualizacion' => $p->modo_visualizacion ?: 'texto',
+            'probabilidad' => (float) ($p->probabilidad ?? 10.0),
             'stock_inicial' => $p->stock_inicial,
             'stock_actual' => $p->stock_actual,
             'stock_ilimitado' => $p->stock_ilimitado,

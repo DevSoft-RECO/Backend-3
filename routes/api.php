@@ -133,11 +133,13 @@ Route::middleware('sso')->group(function () {
 
         Route::post('/ruletas/{ruleta}/reset-stock', [\App\Http\Controllers\Ruleta\AdminRuletaController::class, 'resetStock']);
         Route::get('/ruletas/{ruleta}/giros', [\App\Http\Controllers\Ruleta\AdminRuletaController::class, 'giros']);
+        Route::put('/giros/{giro}', [\App\Http\Controllers\Ruleta\AdminRuletaController::class, 'updateGiro']);
     });
 });
 
 // === RULETA DE PREMIOS (APP MÓVIL PÚBLICA - SIN AUTENTICACIÓN) ===
 Route::prefix('public')->middleware('throttle:120,1')->group(function () {
+    Route::get('/agencias', [\App\Http\Controllers\Ruleta\PublicRuletaController::class, 'agencias']);
     Route::get('/ruletas', [\App\Http\Controllers\Ruleta\PublicRuletaController::class, 'index']);
     Route::get('/ruletas/{ruleta}', [\App\Http\Controllers\Ruleta\PublicRuletaController::class, 'show']);
     Route::post('/ruletas/{ruleta}/giros', [\App\Http\Controllers\Ruleta\PublicRuletaController::class, 'registrarGiro']);

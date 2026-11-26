@@ -102,7 +102,8 @@ class AdminRuletaController extends Controller
             'nombre' => 'required|string|max:255',
             'imagen' => 'nullable|image|mimes:jpeg,jpg,png,webp,gif|max:10240',
             'modo_visualizacion' => 'sometimes|in:texto,imagen',
-            'stock_inicial' => 'required|integer|min:0',
+            'probabilidad' => 'sometimes|numeric|min:0.01|max:1000',
+            'stock_inicial' => 'nullable|integer|min:0',
             'stock_actual' => 'nullable|integer|min:0',
             'stock_ilimitado' => 'sometimes|boolean',
             'es_premio' => 'sometimes|boolean',
@@ -110,8 +111,25 @@ class AdminRuletaController extends Controller
             'activo' => 'sometimes|boolean',
         ]);
 
-        if (!isset($data['stock_actual'])) {
-            $data['stock_actual'] = $data['stock_inicial'];
+        $esPremio = array_key_exists('es_premio', $data)
+            ? filter_var($data['es_premio'], FILTER_VALIDATE_BOOLEAN)
+            : true;
+        $data['es_premio'] = $esPremio;
+
+        if (!$esPremio) {
+            // Casilla sin premio (consuelo): no maneja stock, solo su probabilidad
+            $data['stock_ilimitado'] = true;
+            $data['stock_inicial'] = 0;
+            $data['stock_actual'] = 0;
+        } else {
+            $data['stock_inicial'] = (int) ($data['stock_inicial'] ?? 0);
+            if (!isset($data['stock_actual'])) {
+                $data['stock_actual'] = $data['stock_inicial'];
+            }
+        }
+
+        if (!isset($data['probabilidad'])) {
+            $data['probabilidad'] = 10.00;
         }
         if (!isset($data['orden'])) {
             $data['orden'] = ((int) $ruleta->premios()->max('orden')) + 1;
@@ -140,6 +158,7 @@ class AdminRuletaController extends Controller
             'imagen' => 'nullable|image|mimes:jpeg,jpg,png,webp,gif|max:10240',
             'eliminar_imagen' => 'sometimes|boolean',
             'modo_visualizacion' => 'sometimes|in:texto,imagen',
+            'probabilidad' => 'sometimes|numeric|min:0.01|max:1000',
             'stock_inicial' => 'sometimes|integer|min:0',
             'stock_actual' => 'sometimes|integer|min:0',
             'stock_ilimitado' => 'sometimes|boolean',
@@ -147,6 +166,16 @@ class AdminRuletaController extends Controller
             'orden' => 'sometimes|integer|min:0',
             'activo' => 'sometimes|boolean',
         ]);
+
+        if (array_key_exists('es_premio', $data)) {
+            $esPremio = filter_var($data['es_premio'], FILTER_VALIDATE_BOOLEAN);
+            $data['es_premio'] = $esPremio;
+            if (!$esPremio) {
+                $data['stock_ilimitado'] = true;
+                $data['stock_inicial'] = 0;
+                $data['stock_actual'] = 0;
+            }
+        }
 
         $eliminarImagen = filter_var($data['eliminar_imagen'] ?? false, FILTER_VALIDATE_BOOLEAN);
         unset($data['imagen'], $data['eliminar_imagen']);
@@ -214,6 +243,24 @@ class AdminRuletaController extends Controller
                 'resumen_por_premio' => $resumenPorPremio,
             ],
             'giros' => $giros,
+        ]);
+    }
+
+    public function updateGiro(Request $request, RuletaGiro $giro)
+    {
+        $data = $request->validate([
+            'observacion_ganador' => 'nullable|string|max:500',
+        ]);
+
+        $giro->update([
+            'observacion_ganador' => $data['observacion_ganador'] !== null
+                ? trim($data['observacion_ganador']) ?: null
+                : null,
+        ]);
+
+        return response()->json([
+            'msg' => 'Registro actualizado correctamente',
+            'data' => $giro->fresh(),
         ]);
     }
 

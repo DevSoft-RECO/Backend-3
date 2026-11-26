@@ -17,6 +17,8 @@ class RuletaGiro extends Model
         'es_premio',
         'stock_descontado',
         'dispositivo',
+        'agencia_nombre',
+        'observacion_ganador',
         'created_at',
     ];
 

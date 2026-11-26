@@ -13,6 +13,7 @@ class RuletaPremio extends Model
         'nombre',
         'imagen_path',
         'modo_visualizacion',
+        'probabilidad',
         'stock_inicial',
         'stock_actual',
         'stock_ilimitado',
@@ -22,6 +23,7 @@ class RuletaPremio extends Model
     ];
 
     protected $casts = [
+        'probabilidad' => 'float',
         'stock_inicial' => 'integer',
         'stock_actual' => 'integer',
         'stock_ilimitado' => 'boolean',
